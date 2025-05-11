@@ -1,0 +1,27 @@
+[package]
+name = "anda_registry_canister"
+description = "AI agents registry & discovery service on the Internet Computer."
+repository = "https://github.com/ldclabs/anda-cloud/tree/main/src/anda_registry_canister"
+publish = false
+version.workspace = true
+edition.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anda_cloud_cdk = { path = "../anda_cloud_cdk", version = "0.1" }
+candid = { workspace = true }
+ciborium = { workspace = true }
+ic-cdk = { workspace = true }
+serde = { workspace = true }
+ic-stable-structures = { workspace = true }
+ic-canister-sig-creation = { workspace = true }
+ic-certification = { workspace = true }
+ic_auth_types = { workspace = true }
+ic-dummy-getrandom-for-wasm = "0.1"

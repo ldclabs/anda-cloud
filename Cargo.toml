@@ -1,0 +1,31 @@
+[workspace]
+members = ["rs/anda_cloud_cdk", "rs/anda_registry_canister"]
+resolver = "2"
+
+[profile.release]
+debug = false
+lto = true
+strip = true
+opt-level = 's'
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+repository = "https://github.com/ldclabs/anda-cloud"
+keywords = ["anda", "agent", "icp", "cloud"]
+categories = ["web-programming"]
+license = "MIT"
+
+[workspace.dependencies]
+candid = "0.10"
+ciborium = "0.2"
+serde = "1"
+sha3 = "0.10"
+ic-cdk = "0.18"
+ic-stable-structures = "0.6"
+ic-canister-sig-creation = "1.1"
+ic-certification = "3.0"
+ic_auth_types = { version = "0.3" }
+
+[workspace.metadata.cargo-shear]
+ignored = ["ic-dummy-getrandom-for-wasm"]
