@@ -1,0 +1,135 @@
+import type { Principal } from '@dfinity/principal';
+import type { ActorMethod } from '@dfinity/agent';
+import type { IDL } from '@dfinity/candid';
+
+export interface Agent {
+  'id' : Principal,
+  'tee' : [] | [TEEInfo],
+  'actived_at' : bigint,
+  'updated_at' : bigint,
+  'challenged_expiration' : bigint,
+  'info' : AgentInfo,
+  'created_at' : bigint,
+  'challenged_at' : bigint,
+  'challenged_by' : Principal,
+  'challenge_code' : Uint8Array | number[],
+  'health_power' : bigint,
+}
+export interface AgentEnvelope {
+  'authentication' : SignedEnvelope,
+  'tee' : [] | [TEEInfo],
+  'challenge' : ChallengeReqeust,
+}
+export interface AgentInfo {
+  'payments' : Array<string>,
+  'endpoint' : string,
+  'name' : string,
+  'protocols' : Array<[AgentProtocol, string]>,
+  'description' : string,
+  'handle' : [] | [string],
+}
+export type AgentProtocol = { 'A2A' : null } |
+  { 'MCP' : null } |
+  { 'ANDA' : null };
+export type ChainArgs = { 'Upgrade' : UpgradeArgs } |
+  { 'Init' : InitArgs };
+export interface ChallengeReqeust {
+  'authentication' : [] | [SignedEnvelope],
+  'agent' : AgentInfo,
+  'code' : Uint8Array | number[],
+  'registry' : Principal,
+}
+export interface DelegationCompact {
+  'e' : bigint,
+  'p' : Uint8Array | number[],
+  't' : [] | [Array<Principal>],
+}
+export interface InitArgs {
+  'governance_canister' : [] | [Principal],
+  'name' : string,
+  'challenge_expires_in_ms' : bigint,
+}
+export type RegistryError = { 'NotFound' : { 'handle' : string } } |
+  { 'Generic' : { 'error' : string } } |
+  { 'Unauthorized' : { 'error' : string } } |
+  { 'AlreadyExists' : { 'handle' : string } } |
+  { 'NotSupported' : { 'error' : string } } |
+  { 'Forbidden' : { 'error' : string } } |
+  { 'BadRequest' : { 'error' : string } };
+export interface RegistryState {
+  'max_agent' : bigint,
+  'governance_canister' : [] | [Principal],
+  'name' : string,
+  'challengers' : Array<Principal>,
+  'subscribers' : Array<Principal>,
+  'challenge_expires_in_ms' : bigint,
+  'peers' : Array<Principal>,
+  'agents_total' : bigint,
+}
+export type Result = { 'Ok' : null } |
+  { 'Err' : string };
+export type Result_1 = { 'Ok' : null } |
+  { 'Err' : RegistryError };
+export type Result_2 = { 'Ok' : Agent } |
+  { 'Err' : RegistryError };
+export type Result_3 = { 'Ok' : RegistryState } |
+  { 'Err' : RegistryError };
+export type Result_4 = { 'Ok' : Array<[Principal, bigint]> } |
+  { 'Err' : RegistryError };
+export type Result_5 = { 'Ok' : [bigint, Array<Agent>] } |
+  { 'Err' : RegistryError };
+export type Result_6 = { 'Ok' : Array<Agent> } |
+  { 'Err' : RegistryError };
+export type Result_7 = { 'Ok' : string } |
+  { 'Err' : string };
+export interface SignedDelegationCompact {
+  'd' : DelegationCompact,
+  's' : Uint8Array | number[],
+}
+export interface SignedEnvelope {
+  'd' : [] | [Array<SignedDelegationCompact>],
+  'h' : Uint8Array | number[],
+  'p' : Uint8Array | number[],
+  's' : Uint8Array | number[],
+}
+export interface TEEInfo {
+  'id' : Principal,
+  'url' : string,
+  'kind' : string,
+  'attestation' : [] | [Uint8Array | number[]],
+}
+export interface UpgradeArgs {
+  'governance_canister' : [] | [Principal],
+  'name' : [] | [string],
+  'challenge_expires_in_ms' : [] | [bigint],
+}
+export interface _SERVICE {
+  'admin_add_challengers' : ActorMethod<[Array<Principal>], Result>,
+  'admin_add_peers' : ActorMethod<[Array<Principal>], Result>,
+  'admin_add_subscribers' : ActorMethod<[Array<Principal>], Result>,
+  'admin_remove_challengers' : ActorMethod<[Array<Principal>], Result>,
+  'admin_remove_peers' : ActorMethod<[Array<Principal>], Result>,
+  'admin_remove_subscribers' : ActorMethod<[Array<Principal>], Result>,
+  'challenge' : ActorMethod<[AgentEnvelope], Result_1>,
+  'get_agent' : ActorMethod<[Principal], Result_2>,
+  'get_agent_by_handle' : ActorMethod<[string], Result_2>,
+  'get_state' : ActorMethod<[], Result_3>,
+  'last_challenged' : ActorMethod<[[] | [bigint]], Result_4>,
+  'list' : ActorMethod<[[] | [bigint], [] | [bigint]], Result_5>,
+  'list_by_health_power' : ActorMethod<[[] | [bigint]], Result_6>,
+  'register' : ActorMethod<[AgentEnvelope], Result_1>,
+  'validate_admin_add_challengers' : ActorMethod<[Array<Principal>], Result_7>,
+  'validate_admin_add_peers' : ActorMethod<[Array<Principal>], Result_7>,
+  'validate_admin_add_subscribers' : ActorMethod<[Array<Principal>], Result_7>,
+  'validate_admin_remove_challengers' : ActorMethod<
+    [Array<Principal>],
+    Result_7
+  >,
+  'validate_admin_remove_peers' : ActorMethod<[Array<Principal>], Result_7>,
+  'validate_admin_remove_subscribers' : ActorMethod<
+    [Array<Principal>],
+    Result_7
+  >,
+}
+export declare const idlFactory: IDL.InterfaceFactory;
+export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

@@ -1,11 +1,17 @@
 {
   "canisters": {
-    "ic_tee_identity": {
-      "candid": "src/ic_tee_identity/ic_tee_identity.did",
+    "anda_registry_canister": {
+      "candid": "rs/anda_registry_canister/anda_registry_canister.did",
       "declarations": {
-        "node_compatibility": true
+        "bindings": [
+          "ts",
+          "did",
+          "mo"
+        ],
+        "node_compatibility": true,
+        "output": "declarations/anda_registry_canister"
       },
-      "package": "ic_tee_identity",
+      "package": "anda_registry_canister",
       "optimize": "cycles",
       "type": "rust"
     }

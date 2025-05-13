@@ -1,7 +1,8 @@
 use candid::{CandidType, Principal};
-use ic_auth_types::{ByteArrayB64, ByteBufB64, SignedDelegation};
+use ic_auth_types::ByteArrayB64;
+use ic_auth_verifier::envelope::SignedEnvelope;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{TEEInfo, sha3_256, to_cbor_bytes};
 
@@ -18,8 +19,6 @@ pub struct Agent {
     pub actived_at: u64,
 
     pub health_power: u64,
-
-    pub stake_power: u64,
 
     pub challenge_code: ByteArrayB64<32>,
 
@@ -46,57 +45,52 @@ pub struct AgentInfo {
     // (e.g. "Agent that helps users with recipes and cooking.")
     pub description: String,
 
-    // A URL to the address the agent is hosted at.
-    pub url: String,
+    // A endpoint URL for the agent. This is the URL that other agents and
+    // users will use to communicate with the agent.
+    pub endpoint: String,
 
     // The protocols the agent supports. It is a map of protocol name to
     // agent infomation.
     // (e.g. "ANDA" => "https://DOMAIN/.well-known/agents/{agent_id}.json"，
     //       "A2A" => "https://DOMAIN/.well-known/agent.json")
     pub protocols: BTreeMap<AgentProtocol, String>,
+
+    // Payment protocols the agent supports.
+    // (e.g. ["X402"])
+    pub payments: BTreeSet<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
 pub struct ChallengeReqeust {
-    pub code: ByteArrayB64<32>,
-
     pub registry: Principal,
 
-    pub info: AgentInfo,
+    pub code: ByteArrayB64<32>,
+
+    pub agent: AgentInfo,
 
     pub authentication: Option<SignedEnvelope>,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
-pub struct SignedEnvelope {
-    /// The public key of the self-authenticating principal this request is from.
-    /// This is the head of the delegation chain (if any) and is used to derive
-    /// the principal ID of the sender.
-    pub pubkey: ByteBufB64,
-
-    /// A cryptographic signature authorizing the request.
-    /// When delegations are involved, this is the signature from the tail of the
-    /// delegation chain, not necessarily made by the owner of `pubkey`.
-    pub signature: ByteBufB64,
-
-    /// The chain of delegations connecting `pubkey` to `signature`, in order.
-    /// Each delegation authorizes the next entity in the chain to sign on behalf
-    /// of the previous entity, forming a chain of trust from the original identity
-    /// to the actual signer.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub delegation: Option<Vec<SignedDelegation>>,
-}
-
 impl ChallengeReqeust {
     pub fn digest(&self) -> [u8; 32] {
-        let data = to_cbor_bytes(&(&self.code, &self.registry, &self.info, &self.authentication));
+        let data = to_cbor_bytes(&(&self.registry, &self.code, &self.agent));
+        sha3_256(&data)
+    }
+
+    pub fn full_digest(&self) -> [u8; 32] {
+        let data = to_cbor_bytes(&(
+            &self.registry,
+            &self.code,
+            &self.agent,
+            &self.authentication,
+        ));
         sha3_256(&data)
     }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
-pub struct ChallengeResponse {
-    pub request: ChallengeReqeust,
+pub struct AgentEnvelope {
+    pub challenge: ChallengeReqeust,
     pub authentication: SignedEnvelope,
     pub tee: Option<TEEInfo>,
 }
@@ -113,7 +107,7 @@ pub enum AgentProtocol {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[test]
     fn test_agent() {}

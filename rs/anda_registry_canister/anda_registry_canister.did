@@ -1,0 +1,113 @@
+type Agent = record {
+  id : principal;
+  tee : opt TEEInfo;
+  actived_at : nat64;
+  updated_at : nat64;
+  challenged_expiration : nat64;
+  info : AgentInfo;
+  created_at : nat64;
+  challenged_at : nat64;
+  challenged_by : principal;
+  challenge_code : blob;
+  health_power : nat64;
+};
+type AgentEnvelope = record {
+  authentication : SignedEnvelope;
+  tee : opt TEEInfo;
+  challenge : ChallengeReqeust;
+};
+type AgentInfo = record {
+  payments : vec text;
+  endpoint : text;
+  name : text;
+  protocols : vec record { AgentProtocol; text };
+  description : text;
+  handle : opt text;
+};
+type AgentProtocol = variant { A2A; MCP; ANDA };
+type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type ChallengeReqeust = record {
+  authentication : opt SignedEnvelope;
+  agent : AgentInfo;
+  code : blob;
+  registry : principal;
+};
+type DelegationCompact = record { e : nat64; p : blob; t : opt vec principal };
+type InitArgs = record {
+  governance_canister : opt principal;
+  name : text;
+  challenge_expires_in_ms : nat64;
+};
+type RegistryError = variant {
+  NotFound : record { handle : text };
+  Generic : record { error : text };
+  Unauthorized : record { error : text };
+  AlreadyExists : record { handle : text };
+  NotSupported : record { error : text };
+  Forbidden : record { error : text };
+  BadRequest : record { error : text };
+};
+type RegistryState = record {
+  max_agent : nat64;
+  governance_canister : opt principal;
+  name : text;
+  challengers : vec principal;
+  subscribers : vec principal;
+  challenge_expires_in_ms : nat64;
+  peers : vec principal;
+  agents_total : nat64;
+};
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok; Err : RegistryError };
+type Result_2 = variant { Ok : Agent; Err : RegistryError };
+type Result_3 = variant { Ok : RegistryState; Err : RegistryError };
+type Result_4 = variant {
+  Ok : vec record { principal; nat64 };
+  Err : RegistryError;
+};
+type Result_5 = variant {
+  Ok : record { nat64; vec Agent };
+  Err : RegistryError;
+};
+type Result_6 = variant { Ok : vec Agent; Err : RegistryError };
+type Result_7 = variant { Ok : text; Err : text };
+type SignedDelegationCompact = record { d : DelegationCompact; s : blob };
+type SignedEnvelope = record {
+  d : opt vec SignedDelegationCompact;
+  h : blob;
+  p : blob;
+  s : blob;
+};
+type TEEInfo = record {
+  id : principal;
+  url : text;
+  kind : text;
+  attestation : opt blob;
+};
+type UpgradeArgs = record {
+  governance_canister : opt principal;
+  name : opt text;
+  challenge_expires_in_ms : opt nat64;
+};
+service : (opt ChainArgs) -> {
+  admin_add_challengers : (vec principal) -> (Result);
+  admin_add_peers : (vec principal) -> (Result);
+  admin_add_subscribers : (vec principal) -> (Result);
+  admin_remove_challengers : (vec principal) -> (Result);
+  admin_remove_peers : (vec principal) -> (Result);
+  admin_remove_subscribers : (vec principal) -> (Result);
+  challenge : (AgentEnvelope) -> (Result_1);
+  get_agent : (principal) -> (Result_2) query;
+  get_agent_by_handle : (text) -> (Result_2) query;
+  get_state : () -> (Result_3) query;
+  last_challenged : (opt nat64) -> (Result_4) query;
+  list : (opt nat64, opt nat64) -> (Result_5) query;
+  list_by_health_power : (opt nat64) -> (Result_6) query;
+  register : (AgentEnvelope) -> (Result_1);
+  validate_admin_add_challengers : (vec principal) -> (Result_7);
+  validate_admin_add_peers : (vec principal) -> (Result_7);
+  validate_admin_add_subscribers : (vec principal) -> (Result_7);
+  validate_admin_remove_challengers : (vec principal) -> (Result_7);
+  validate_admin_remove_peers : (vec principal) -> (Result_7);
+  validate_admin_remove_subscribers : (vec principal) -> (Result_7);
+}

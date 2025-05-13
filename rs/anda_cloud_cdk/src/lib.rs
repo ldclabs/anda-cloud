@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 
 pub mod agent;
+pub mod registry;
 
 pub fn to_cbor_bytes(obj: &impl Serialize) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
@@ -24,5 +25,5 @@ pub struct TEEInfo {
     pub kind: String,
     // (e.g. https://DOMAIN/.well-known/tee.json)
     pub url: String,
-    pub attestation: ByteBufB64,
+    pub attestation: Option<ByteBufB64>,
 }
