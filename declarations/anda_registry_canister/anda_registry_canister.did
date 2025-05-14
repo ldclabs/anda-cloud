@@ -1,32 +1,31 @@
 type Agent = record {
   id : principal;
   tee : opt TEEInfo;
-  actived_at : nat64;
-  updated_at : nat64;
   challenged_expiration : nat64;
   info : AgentInfo;
   created_at : nat64;
   challenged_at : nat64;
   challenged_by : principal;
+  actived_start : nat64;
   challenge_code : blob;
   health_power : nat64;
 };
-type AgentEnvelope = record {
-  authentication : SignedEnvelope;
-  tee : opt TEEInfo;
-  challenge : ChallengeReqeust;
-};
 type AgentInfo = record {
-  payments : vec text;
+  payments : vec PaymentProtocol;
   endpoint : text;
   name : text;
   protocols : vec record { AgentProtocol; text };
   description : text;
-  handle : opt text;
+  handle : opt record { principal; text };
 };
 type AgentProtocol = variant { A2A; MCP; ANDA };
 type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
-type ChallengeReqeust = record {
+type ChallengeEnvelope = record {
+  authentication : SignedEnvelope;
+  tee : opt TEEInfo;
+  request : ChallengeRequest;
+};
+type ChallengeRequest = record {
   authentication : opt SignedEnvelope;
   agent : AgentInfo;
   code : blob;
@@ -38,6 +37,7 @@ type InitArgs = record {
   name : text;
   challenge_expires_in_ms : nat64;
 };
+type PaymentProtocol = variant { X402 };
 type RegistryError = variant {
   NotFound : record { handle : text };
   Generic : record { error : text };
@@ -55,6 +55,7 @@ type RegistryState = record {
   subscribers : vec principal;
   challenge_expires_in_ms : nat64;
   peers : vec principal;
+  name_canisters : vec principal;
   agents_total : nat64;
 };
 type Result = variant { Ok; Err : text };
@@ -81,9 +82,10 @@ type SignedEnvelope = record {
 type TEEInfo = record {
   id : principal;
   url : text;
-  kind : text;
+  kind : TEEKind;
   attestation : opt blob;
 };
+type TEEKind = variant { NITRO };
 type UpgradeArgs = record {
   governance_canister : opt principal;
   name : opt text;
@@ -91,23 +93,27 @@ type UpgradeArgs = record {
 };
 service : (opt ChainArgs) -> {
   admin_add_challengers : (vec principal) -> (Result);
+  admin_add_name_canisters : (vec principal) -> (Result);
   admin_add_peers : (vec principal) -> (Result);
   admin_add_subscribers : (vec principal) -> (Result);
   admin_remove_challengers : (vec principal) -> (Result);
+  admin_remove_name_canisters : (vec principal) -> (Result);
   admin_remove_peers : (vec principal) -> (Result);
   admin_remove_subscribers : (vec principal) -> (Result);
-  challenge : (AgentEnvelope) -> (Result_1);
+  challenge : (ChallengeEnvelope) -> (Result_1);
   get_agent : (principal) -> (Result_2) query;
   get_agent_by_handle : (text) -> (Result_2) query;
   get_state : () -> (Result_3) query;
   last_challenged : (opt nat64) -> (Result_4) query;
   list : (opt nat64, opt nat64) -> (Result_5) query;
   list_by_health_power : (opt nat64) -> (Result_6) query;
-  register : (AgentEnvelope) -> (Result_1);
+  register : (ChallengeEnvelope) -> (Result_1);
   validate_admin_add_challengers : (vec principal) -> (Result_7);
+  validate_admin_add_name_canisters : (vec principal) -> (Result_7);
   validate_admin_add_peers : (vec principal) -> (Result_7);
   validate_admin_add_subscribers : (vec principal) -> (Result_7);
   validate_admin_remove_challengers : (vec principal) -> (Result_7);
+  validate_admin_remove_name_canisters : (vec principal) -> (Result_7);
   validate_admin_remove_peers : (vec principal) -> (Result_7);
   validate_admin_remove_subscribers : (vec principal) -> (Result_7);
 }

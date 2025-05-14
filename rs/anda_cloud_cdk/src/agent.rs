@@ -30,8 +30,8 @@ pub struct Agent {
     /// Calculation example:
     /// 1. Assuming the challenge validity period is 1 hour (3,600,000 ms)
     /// 2. When an agent is successfully challenged, health_power increases by (now_ms - challenged_at)
-    /// 3. When an agent hasn't been successfully challenged for over 1 hour (e.g., challenged after 1.5 hours),
-    ///    health_power decreases by (now_ms - challenged_expiration), which would be 1,800,000 ms
+    /// 3. When an agent hasn't been successfully challenged for over 1 hour (e.g., challenge after 1.5 hours),
+    ///    health_power decreases by (now_ms - challenged_at), which would be 5,400,000
     ///    and actived_start is reset to now_ms
     pub health_power: u64,
 
@@ -58,7 +58,7 @@ pub struct Agent {
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
 pub struct AgentInfo {
     /// Unique account identifier of the agent on dMsg.net.
-    pub handle: Option<String>,
+    pub handle: Option<(Principal, String)>,
 
     /// Human readable name of the agent.
     /// (e.g. "Anda ICP")
@@ -260,6 +260,31 @@ pub enum AgentProtocol {
     A2A,
     /// Model Context Protocol, https://github.com/modelcontextprotocol
     MCP,
+}
+
+pub static AGENT_EVENT_API: &str = "on_agent_event";
+
+/// Represents an event related to an agent's registration or status change.
+#[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
+pub struct AgentEvent {
+    /// The principal ID of the agent.
+    pub id: Principal,
+
+    /// The event type.
+    pub kind: AgentEventKind,
+
+    /// The timestamp when the event occurred in milliseconds since the Unix epoch.
+    pub ts: u64,
+}
+
+/// Enumerates the types of events that can occur for an agent.
+#[derive(
+    Clone, Debug, CandidType, Deserialize, Serialize, Eq, PartialEq, Hash, Ord, PartialOrd,
+)]
+pub enum AgentEventKind {
+    Registered,
+    Challenged,
+    Unregistered,
 }
 
 #[cfg(test)]

@@ -36,13 +36,13 @@ fn validate_principals(principals: &BTreeSet<Principal>) -> Result<(), String> {
     Ok(())
 }
 
-async fn call<In, Out>(id: Principal, method: &str, args: In, cycles: u128) -> Result<Out, String>
+async fn call<In, Out>(id: Principal, method: &str, args: &In, cycles: u128) -> Result<Out, String>
 where
     In: ArgumentEncoder + Send,
     Out: candid::CandidType + for<'a> candid::Deserialize<'a>,
 {
     let res = ic_cdk::call::Call::bounded_wait(id, method)
-        .with_args(&args)
+        .with_args(args)
         .with_cycles(cycles)
         .await
         .map_err(|err| format!("failed to call {} on {:?}, error: {:?}", method, &id, err))?;
@@ -54,12 +54,12 @@ where
     })
 }
 
-async fn notify<In>(id: Principal, method: &str, arg: In) -> Result<(), String>
+async fn notify<In>(id: Principal, method: &str, arg: &In) -> Result<(), String>
 where
     In: CandidType,
 {
     ic_cdk::call::Call::unbounded_wait(id, method)
-        .with_arg(&arg)
+        .with_arg(arg)
         .oneway()
         .map_err(|err| format!("failed to call {} on {:?}, error: {:?}", method, &id, err))
 }

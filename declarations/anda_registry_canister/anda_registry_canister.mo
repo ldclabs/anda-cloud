@@ -5,32 +5,31 @@ module {
   public type Agent = {
     id : Principal;
     tee : ?TEEInfo;
-    actived_at : Nat64;
-    updated_at : Nat64;
     challenged_expiration : Nat64;
     info : AgentInfo;
     created_at : Nat64;
     challenged_at : Nat64;
     challenged_by : Principal;
+    actived_start : Nat64;
     challenge_code : Blob;
     health_power : Nat64;
   };
-  public type AgentEnvelope = {
-    authentication : SignedEnvelope;
-    tee : ?TEEInfo;
-    challenge : ChallengeReqeust;
-  };
   public type AgentInfo = {
-    payments : [Text];
+    payments : [PaymentProtocol];
     endpoint : Text;
     name : Text;
     protocols : [(AgentProtocol, Text)];
     description : Text;
-    handle : ?Text;
+    handle : ?(Principal, Text);
   };
   public type AgentProtocol = { #A2A; #MCP; #ANDA };
   public type ChainArgs = { #Upgrade : UpgradeArgs; #Init : InitArgs };
-  public type ChallengeReqeust = {
+  public type ChallengeEnvelope = {
+    authentication : SignedEnvelope;
+    tee : ?TEEInfo;
+    request : ChallengeRequest;
+  };
+  public type ChallengeRequest = {
     authentication : ?SignedEnvelope;
     agent : AgentInfo;
     code : Blob;
@@ -42,6 +41,7 @@ module {
     name : Text;
     challenge_expires_in_ms : Nat64;
   };
+  public type PaymentProtocol = { #X402 };
   public type RegistryError = {
     #NotFound : { handle : Text };
     #Generic : { error : Text };
@@ -59,6 +59,7 @@ module {
     subscribers : [Principal];
     challenge_expires_in_ms : Nat64;
     peers : [Principal];
+    name_canisters : [Principal];
     agents_total : Nat64;
   };
   public type Result = { #Ok; #Err : Text };
@@ -79,9 +80,10 @@ module {
   public type TEEInfo = {
     id : Principal;
     url : Text;
-    kind : Text;
+    kind : TEEKind;
     attestation : ?Blob;
   };
+  public type TEEKind = { #NITRO };
   public type UpgradeArgs = {
     governance_canister : ?Principal;
     name : ?Text;
@@ -89,23 +91,27 @@ module {
   };
   public type Self = ?ChainArgs -> async actor {
     admin_add_challengers : shared [Principal] -> async Result;
+    admin_add_name_canisters : shared [Principal] -> async Result;
     admin_add_peers : shared [Principal] -> async Result;
     admin_add_subscribers : shared [Principal] -> async Result;
     admin_remove_challengers : shared [Principal] -> async Result;
+    admin_remove_name_canisters : shared [Principal] -> async Result;
     admin_remove_peers : shared [Principal] -> async Result;
     admin_remove_subscribers : shared [Principal] -> async Result;
-    challenge : shared AgentEnvelope -> async Result_1;
+    challenge : shared ChallengeEnvelope -> async Result_1;
     get_agent : shared query Principal -> async Result_2;
     get_agent_by_handle : shared query Text -> async Result_2;
     get_state : shared query () -> async Result_3;
     last_challenged : shared query ?Nat64 -> async Result_4;
     list : shared query (?Nat64, ?Nat64) -> async Result_5;
     list_by_health_power : shared query ?Nat64 -> async Result_6;
-    register : shared AgentEnvelope -> async Result_1;
+    register : shared ChallengeEnvelope -> async Result_1;
     validate_admin_add_challengers : shared [Principal] -> async Result_7;
+    validate_admin_add_name_canisters : shared [Principal] -> async Result_7;
     validate_admin_add_peers : shared [Principal] -> async Result_7;
     validate_admin_add_subscribers : shared [Principal] -> async Result_7;
     validate_admin_remove_challengers : shared [Principal] -> async Result_7;
+    validate_admin_remove_name_canisters : shared [Principal] -> async Result_7;
     validate_admin_remove_peers : shared [Principal] -> async Result_7;
     validate_admin_remove_subscribers : shared [Principal] -> async Result_7;
   }

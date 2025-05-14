@@ -97,6 +97,10 @@ impl TEEInfo {
         if url::Url::parse(&self.url).is_err() {
             return Err(format!("{:?} is not a valid URL", self.url));
         }
+
+        if self.attestation.is_none() {
+            return Err("attestation is required".to_string());
+        }
         Ok(())
     }
 }

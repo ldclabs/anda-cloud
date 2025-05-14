@@ -34,6 +34,36 @@ fn validate_admin_remove_peers(args: BTreeSet<Principal>) -> Result<String, Stri
 }
 
 #[ic_cdk::update(guard = "is_controller")]
+fn admin_add_name_canisters(args: BTreeSet<Principal>) -> Result<(), String> {
+    validate_principals(&args)?;
+    store::state::with_mut(|s| {
+        s.name_canisters.extend(args);
+        Ok(())
+    })
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+fn admin_remove_name_canisters(args: BTreeSet<Principal>) -> Result<(), String> {
+    validate_principals(&args)?;
+    store::state::with_mut(|s| {
+        s.name_canisters.retain(|v| !args.contains(v));
+        Ok(())
+    })
+}
+
+#[ic_cdk::update]
+fn validate_admin_add_name_canisters(args: BTreeSet<Principal>) -> Result<String, String> {
+    validate_principals(&args)?;
+    pretty_format(&args)
+}
+
+#[ic_cdk::update]
+fn validate_admin_remove_name_canisters(args: BTreeSet<Principal>) -> Result<String, String> {
+    validate_principals(&args)?;
+    pretty_format(&args)
+}
+
+#[ic_cdk::update(guard = "is_controller")]
 fn admin_add_challengers(args: BTreeSet<Principal>) -> Result<(), String> {
     validate_principals(&args)?;
     store::state::with_mut(|s| {

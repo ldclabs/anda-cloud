@@ -22,7 +22,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
-use crate::rand_bytes;
+use crate::{call, notify, rand_bytes};
 
 const MAX_LAST_CHALLENGED: usize = 10000;
 const MAX_HEALTH_POWER_LIST: usize = 1000;
@@ -93,7 +93,7 @@ pub struct AgentLocal {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AgentInfoLocal {
     #[serde(rename = "h")]
-    handle: Option<String>,
+    handle: Option<(Principal, String)>,
 
     #[serde(rename = "n")]
     name: String,
@@ -264,6 +264,17 @@ pub mod state {
             create_cel_expr(&DefaultCelBuilder::skip_certification());
     }
 
+    // https://github.com/ldclabs/ic-panda/blob/main/src/ic_message_types/src/profile.rs#L15
+    #[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
+    struct UserInfo {
+        pub id: Principal,
+        pub name: String,
+        pub image: String,
+        pub profile_canister: Principal,
+        pub cose_canister: Option<Principal>,
+        pub username: Option<String>,
+    }
+
     pub static DEFAULT_CERT_ENTRY: Lazy<HttpCertificationTreeEntry> =
         Lazy::new(|| HttpCertificationTreeEntry::new(&*DEFAULT_EXPR_PATH, *DEFAULT_CERTIFICATION));
 
@@ -342,6 +353,49 @@ pub mod state {
             });
         });
     }
+
+    pub fn notify_subscribers(event: AgentEvent) {
+        let subscribers = STATE.with_borrow(|s| s.subscribers.clone());
+        if subscribers.is_empty() {
+            return;
+        }
+
+        ic_cdk::futures::spawn(async move {
+            for subscriber in subscribers {
+                let _ = notify(subscriber, AGENT_EVENT_API, &event).await;
+            }
+        });
+    }
+
+    pub async fn check_handle(
+        canister: Principal,
+        handle: String,
+        owner: Principal,
+    ) -> Result<(), RegistryError> {
+        STATE.with_borrow(|s| {
+            if !s.name_canisters.contains(&canister) {
+                return Err(RegistryError::BadRequest {
+                    error: "invalid handle canister".to_string(),
+                });
+            }
+            Ok(())
+        })?;
+
+        // https://github.com/ldclabs/ic-panda/blob/main/src/ic_message/src/api_query.rs#L83
+        let rt: Result<UserInfo, String> = call(canister, "get_by_username", &(handle.clone(),), 0)
+            .await
+            .map_err(|error| RegistryError::Generic { error })?;
+
+        if let Ok(user) = rt {
+            if user.id == owner {
+                return Ok(());
+            }
+        }
+
+        Err(RegistryError::BadRequest {
+            error: format!("handle {handle:?} is not belong to {owner}"),
+        })
+    }
 }
 
 pub mod agent {
@@ -370,8 +424,8 @@ pub mod agent {
             });
 
             ri.id_map.insert(id, (idx, now_ms));
-            if let Some(handle) = info.handle.clone() {
-                ri.by_handle.insert(handle, idx);
+            if let Some((_, handle)) = &info.handle {
+                ri.by_handle.insert(handle.clone(), idx);
             }
 
             AGENT_STORE.with_borrow_mut(|ra| {
@@ -432,8 +486,8 @@ pub mod agent {
                     return Ok(());
                 }
 
-                if let Some(handle) = info.handle.clone() {
-                    ri.by_handle.insert(handle, *idx);
+                if let Some((_, handle)) = &info.handle {
+                    ri.by_handle.insert(handle.clone(), *idx);
                 }
 
                 ri.by_health_power.remove(&(agent.health_power, *idx));
@@ -444,7 +498,7 @@ pub mod agent {
                     agent.actived_start = now_ms;
                     agent.health_power = agent
                         .health_power
-                        .saturating_sub(now_ms - agent.challenged_expiration);
+                        .saturating_sub(now_ms - agent.challenged_at);
                 } else {
                     agent.health_power += now_ms - agent.challenged_at;
                 }
@@ -533,14 +587,21 @@ pub mod agent {
         })
     }
 
-    pub fn list_by_health_power(take: usize) -> Result<Vec<Agent>, RegistryError> {
+    pub fn list_by_health_power(take: usize, now_ms: u64) -> Result<Vec<Agent>, RegistryError> {
         INDEX.with_borrow(|ri| {
             AGENT_STORE.with_borrow(|ra| {
                 let mut agents = Vec::with_capacity(take);
                 let iter = ri.by_health_power.iter().rev();
-                for (_, idx) in iter.take(take) {
+                for (_, idx) in iter {
                     if let Some(agent) = ra.get(idx) {
+                        if agent.challenged_expiration <= now_ms {
+                            continue;
+                        }
+
                         agents.push(agent.into());
+                        if agents.len() >= take {
+                            break;
+                        }
                     }
                 }
 

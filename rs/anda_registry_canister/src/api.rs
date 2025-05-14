@@ -1,8 +1,9 @@
 use anda_cloud_cdk::{
-    agent::{Agent, ChallengeEnvelope, ZERO_CHALLENGE_CODE},
+    agent::{Agent, AgentEvent, AgentEventKind, ChallengeEnvelope, ZERO_CHALLENGE_CODE},
     registry::{RegistryError, RegistryState},
 };
 use candid::Principal;
+use ic_tee_nitro_attestation::parse_and_verify;
 use std::collections::BTreeMap;
 
 use crate::{MILLISECONDS, store};
@@ -58,10 +59,44 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         .authentication
         .verify(now_ms, Some(canister_self), Some(&full_digest))
         .map_err(|error| RegistryError::Unauthorized { error })?;
-    if let Some(_handle) = &input.request.agent.handle {
-        // TODO: check handle
+
+    if let Some(tee) = &input.tee {
+        let attestation = parse_and_verify(tee.attestation.as_ref().ok_or_else(|| {
+            RegistryError::BadRequest {
+                error: "attestation is not provided".to_string(),
+            }
+        })?)
+        .map_err(|error| RegistryError::BadRequest {
+            error: format!("attestation is not valid: {}", error),
+        })?;
+
+        if attestation.public_key.as_ref().map(|v| v.as_slice())
+            != Some(input.authentication.pubkey.as_slice())
+        {
+            return Err(RegistryError::BadRequest {
+                error: format!("attestation public key is not equal to agent public key"),
+            });
+        }
+        if attestation.nonce.as_ref().map(|v| v.as_slice()) != Some(input.request.code.as_slice()) {
+            return Err(RegistryError::BadRequest {
+                error: format!("attestation nonce is not equal to chanllenge code"),
+            });
+        }
     }
-    store::agent::register(agent_id, challenger, input.request.agent, input.tee, now_ms).await
+
+    if let Some((canister, handle)) = &input.request.agent.handle {
+        store::state::check_handle(*canister, handle.clone(), agent_id).await?;
+    }
+
+    store::agent::register(agent_id, challenger, input.request.agent, input.tee, now_ms).await?;
+
+    store::state::notify_subscribers(AgentEvent {
+        id: agent_id,
+        kind: AgentEventKind::Registered,
+        ts: now_ms,
+    });
+
+    Ok(())
 }
 
 #[ic_cdk::update]
@@ -106,8 +141,33 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         .authentication
         .verify(now_ms, Some(canister_self), Some(&full_digest))
         .map_err(|error| RegistryError::Unauthorized { error })?;
-    if let Some(_handle) = &input.request.agent.handle {
-        // TODO: check handle
+
+    if let Some(tee) = &input.tee {
+        let attestation = parse_and_verify(tee.attestation.as_ref().ok_or_else(|| {
+            RegistryError::BadRequest {
+                error: "attestation is not provided".to_string(),
+            }
+        })?)
+        .map_err(|error| RegistryError::BadRequest {
+            error: format!("attestation is not valid: {}", error),
+        })?;
+
+        if attestation.public_key.as_ref().map(|v| v.as_slice())
+            != Some(input.authentication.pubkey.as_slice())
+        {
+            return Err(RegistryError::BadRequest {
+                error: format!("attestation public key is not equal to agent public key"),
+            });
+        }
+        if attestation.nonce.as_ref().map(|v| v.as_slice()) != Some(input.request.code.as_slice()) {
+            return Err(RegistryError::BadRequest {
+                error: format!("attestation nonce is not equal to chanllenge code"),
+            });
+        }
+    }
+
+    if let Some((canister, handle)) = &input.request.agent.handle {
+        store::state::check_handle(*canister, handle.clone(), agent_id).await?;
     }
 
     store::agent::challenge(
@@ -118,7 +178,15 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         input.tee,
         now_ms,
     )
-    .await
+    .await?;
+
+    store::state::notify_subscribers(AgentEvent {
+        id: agent_id,
+        kind: AgentEventKind::Challenged,
+        ts: now_ms,
+    });
+
+    Ok(())
 }
 
 #[ic_cdk::query]
@@ -140,7 +208,8 @@ fn list(prev: Option<u64>, take: Option<u64>) -> Result<(u64, Vec<Agent>), Regis
 #[ic_cdk::query]
 fn list_by_health_power(take: Option<u64>) -> Result<Vec<Agent>, RegistryError> {
     let take = take.unwrap_or(10).min(1000);
-    store::agent::list_by_health_power(take as usize)
+    let now_ms = ic_cdk::api::time() / MILLISECONDS;
+    store::agent::list_by_health_power(take as usize, now_ms)
 }
 
 #[ic_cdk::query]

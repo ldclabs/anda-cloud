@@ -29,6 +29,7 @@ ic-http-certification = "3.0"
 ic-stable-structures = "0.6"
 ic_auth_types = { version = "0.4" }
 ic_auth_verifier = { version = "0.4" }
+ic_tee_nitro_attestation = { version = "0.4" }
 lazy_static = "1.5"
 once_cell = "1.21"
 url = "2.5"

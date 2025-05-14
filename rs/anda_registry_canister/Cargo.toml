@@ -26,6 +26,7 @@ serde_json = { workspace = true }
 ic-stable-structures = { workspace = true }
 ic-http-certification = { workspace = true }
 ic_auth_types = { workspace = true }
+ic_tee_nitro_attestation = { workspace = true }
 lazy_static = { workspace = true }
 once_cell = { workspace = true }
 url = { workspace = true }
