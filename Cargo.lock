@@ -11,8 +11,10 @@ dependencies = [
  "ic_auth_types",
  "ic_auth_verifier",
  "serde",
+ "serde_json",
  "sha3",
  "thiserror 2.0.12",
+ "url",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 use anda_cloud_cdk::{
-    TEEInfo,
+    PaymentProtocol, TEEInfo, TEEKind,
     agent::*,
     registry::{RegistryError, RegistryState},
 };
@@ -68,17 +68,14 @@ pub struct AgentLocal {
     #[serde(rename = "c")]
     created_at: u64,
 
-    #[serde(rename = "u")]
-    updated_at: u64,
-
     #[serde(rename = "a")]
-    actived_at: u64,
+    actived_start: u64,
 
     #[serde(rename = "hp")]
     health_power: u64,
 
     #[serde(rename = "cc")]
-    challenge_code: ByteArrayB64<32>,
+    challenge_code: ByteArrayB64<16>,
 
     #[serde(rename = "ca")]
     challenged_at: u64,
@@ -111,7 +108,7 @@ pub struct AgentInfoLocal {
     protocols: BTreeMap<AgentProtocol, String>,
 
     #[serde(rename = "pm")]
-    payments: BTreeSet<String>,
+    payments: BTreeSet<PaymentProtocol>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -119,7 +116,7 @@ pub struct TEEInfoLocal {
     id: Principal,
 
     #[serde(rename = "k")]
-    kind: String,
+    kind: TEEKind,
 
     #[serde(rename = "u")]
     url: String,
@@ -178,8 +175,7 @@ impl From<AgentLocal> for Agent {
             id: agent.id,
             info: agent.info.into(),
             created_at: agent.created_at,
-            updated_at: agent.updated_at,
-            actived_at: agent.actived_at,
+            actived_start: agent.actived_start,
             health_power: agent.health_power,
             challenge_code: agent.challenge_code,
             challenged_at: agent.challenged_at,
@@ -196,8 +192,7 @@ impl From<Agent> for AgentLocal {
             id: agent.id,
             info: agent.info.into(),
             created_at: agent.created_at,
-            updated_at: agent.updated_at,
-            actived_at: agent.actived_at,
+            actived_start: agent.actived_start,
             health_power: agent.health_power,
             challenge_code: agent.challenge_code,
             challenged_at: agent.challenged_at,
@@ -359,7 +354,7 @@ pub mod agent {
         tee: Option<TEEInfo>,
         now_ms: u64,
     ) -> Result<(), RegistryError> {
-        let code = rand_bytes::<32>()
+        let code = rand_bytes::<16>()
             .await
             .map_err(|error| RegistryError::Generic { error })?;
         INDEX.with_borrow_mut(|ri| {
@@ -384,8 +379,7 @@ pub mod agent {
                     id,
                     info: info.into(),
                     created_at: now_ms,
-                    updated_at: now_ms,
-                    actived_at: now_ms,
+                    actived_start: now_ms,
                     health_power: 0,
                     challenge_code: code.into(),
                     challenged_at: now_ms,
@@ -403,12 +397,12 @@ pub mod agent {
     pub async fn challenge(
         id: Principal,
         challenged_by: Principal,
-        code: ByteArrayB64<32>,
+        code: ByteArrayB64<16>,
         info: AgentInfo,
         tee: Option<TEEInfo>,
         now_ms: u64,
     ) -> Result<(), RegistryError> {
-        let new_code = rand_bytes::<32>()
+        let new_code = rand_bytes::<16>()
             .await
             .map_err(|error| RegistryError::Generic { error })?;
         INDEX.with_borrow_mut(|ri| {
@@ -447,7 +441,7 @@ pub mod agent {
                     // 之前的挑战已过期，进行惩罚
                     // 1. 重置激活时间
                     // 2. 减少健康权重
-                    agent.actived_at = now_ms;
+                    agent.actived_start = now_ms;
                     agent.health_power = agent
                         .health_power
                         .saturating_sub(now_ms - agent.challenged_expiration);
@@ -512,10 +506,7 @@ pub mod agent {
                     handle: handle.clone(),
                 })?;
             AGENT_STORE
-                .with_borrow(|ra| {
-                    ra.get(idx)
-                        .ok_or(RegistryError::NotFound { handle })
-                })
+                .with_borrow(|ra| ra.get(idx).ok_or(RegistryError::NotFound { handle }))
                 .map(|a| a.into())
         })
     }

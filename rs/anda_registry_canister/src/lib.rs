@@ -1,5 +1,5 @@
 use anda_cloud_cdk::{
-    agent::{Agent, AgentEnvelope},
+    agent::{Agent, ChallengeEnvelope},
     registry::{RegistryError, RegistryState},
 };
 use candid::{CandidType, Principal, utils::ArgumentEncoder};
