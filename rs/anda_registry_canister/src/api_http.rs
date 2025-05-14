@@ -22,8 +22,8 @@ static IC_CERTIFICATE_HEADER: &str = "ic-certificate";
 static IC_CERTIFICATE_EXPRESSION_HEADER: &str = "ic-certificateexpression";
 
 // request url example:
-// https://uxrrr-q7777-77774-qaaaq-cai.icp0.io/lookup?handle=abc123
-// https://uxrrr-q7777-77774-qaaaq-cai.icp0.io/lookup?id=nprym-ylvyz-ig3fr-lgcmn-zzzt4-tyuix-3v6bm-fsel7-6lq6x-zh2w7-zqe
+// https://lfcwh-piaaa-aaaap-an2fa-cai.icp0.io/lookup?handle=abc123
+// https://lfcwh-piaaa-aaaap-an2fa-cai.icp0.io/lookup?id=nprym-ylvyz-ig3fr-lgcmn-zzzt4-tyuix-3v6bm-fsel7-6lq6x-zh2w7-zqe
 #[ic_cdk::query(hidden = true)]
 async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
     let witness = store::state::http_tree_with(|t| {

@@ -31,3 +31,7 @@ lazy_static = { workspace = true }
 once_cell = { workspace = true }
 url = { workspace = true }
 ic-dummy-getrandom-for-wasm = "0.1"
+
+[dev-dependencies]
+rand = { workspace = true }
+tokio = { workspace = true, features = ["full"] }

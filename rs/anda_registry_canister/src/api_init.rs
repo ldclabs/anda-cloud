@@ -26,7 +26,7 @@ pub struct UpgradeArgs {
 #[ic_cdk::init]
 fn init(args: Option<ChainArgs>) {
     match args.unwrap_or(ChainArgs::Init(InitArgs {
-        name: "IC TEE Identity Service".to_string(),
+        name: "Anda AI Agents Registry Service".to_string(),
         challenge_expires_in_ms: CHALLENGE_EXPIRES_IN_MS, // 1 day
         governance_canister: None,
     })) {

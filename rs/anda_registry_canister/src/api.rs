@@ -6,7 +6,7 @@ use candid::Principal;
 use ic_tee_nitro_attestation::parse_and_verify;
 use std::collections::BTreeMap;
 
-use crate::{MILLISECONDS, store};
+use crate::{MILLISECONDS, rand_bytes, store};
 
 #[ic_cdk::query]
 fn get_state() -> Result<RegistryState, RegistryError> {
@@ -74,12 +74,12 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
             != Some(input.authentication.pubkey.as_slice())
         {
             return Err(RegistryError::BadRequest {
-                error: format!("attestation public key is not equal to agent public key"),
+                error: "attestation public key is not equal to agent public key".to_string(),
             });
         }
         if attestation.nonce.as_ref().map(|v| v.as_slice()) != Some(input.request.code.as_slice()) {
             return Err(RegistryError::BadRequest {
-                error: format!("attestation nonce is not equal to chanllenge code"),
+                error: "attestation nonce is not equal to chanllenge code".to_string(),
             });
         }
     }
@@ -88,7 +88,18 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         store::state::check_handle(*canister, handle.clone(), agent_id).await?;
     }
 
-    store::agent::register(agent_id, challenger, input.request.agent, input.tee, now_ms).await?;
+    let code = rand_bytes::<16>()
+        .await
+        .map_err(|error| RegistryError::Generic { error })?;
+    store::agent::register(
+        agent_id,
+        challenger,
+        input.request.agent,
+        input.tee,
+        code.into(),
+        now_ms,
+    )
+    .await?;
 
     store::state::notify_subscribers(AgentEvent {
         id: agent_id,
@@ -156,12 +167,12 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
             != Some(input.authentication.pubkey.as_slice())
         {
             return Err(RegistryError::BadRequest {
-                error: format!("attestation public key is not equal to agent public key"),
+                error: "attestation public key is not equal to agent public key".to_string(),
             });
         }
         if attestation.nonce.as_ref().map(|v| v.as_slice()) != Some(input.request.code.as_slice()) {
             return Err(RegistryError::BadRequest {
-                error: format!("attestation nonce is not equal to chanllenge code"),
+                error: "attestation nonce is not equal to chanllenge code".to_string(),
             });
         }
     }
@@ -170,12 +181,16 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         store::state::check_handle(*canister, handle.clone(), agent_id).await?;
     }
 
+    let new_code = rand_bytes::<16>()
+        .await
+        .map_err(|error| RegistryError::Generic { error })?;
     store::agent::challenge(
         agent_id,
         challenger,
-        input.request.code,
         input.request.agent,
         input.tee,
+        input.request.code,
+        new_code.into(),
         now_ms,
     )
     .await?;

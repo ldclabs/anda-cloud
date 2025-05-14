@@ -22,7 +22,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
-use crate::{call, notify, rand_bytes};
+use crate::{call, notify};
 
 const MAX_LAST_CHALLENGED: usize = 10000;
 const MAX_HEALTH_POWER_LIST: usize = 1000;
@@ -406,11 +406,9 @@ pub mod agent {
         challenged_by: Principal,
         info: AgentInfo,
         tee: Option<TEEInfo>,
+        code: ByteArrayB64<16>,
         now_ms: u64,
     ) -> Result<(), RegistryError> {
-        let code = rand_bytes::<16>()
-            .await
-            .map_err(|error| RegistryError::Generic { error })?;
         INDEX.with_borrow_mut(|ri| {
             if ri.id_map.contains_key(&id) {
                 return Err(RegistryError::AlreadyExists {
@@ -435,7 +433,7 @@ pub mod agent {
                     created_at: now_ms,
                     actived_start: now_ms,
                     health_power: 0,
-                    challenge_code: code.into(),
+                    challenge_code: code,
                     challenged_at: now_ms,
                     challenged_by,
                     challenged_expiration: now_ms + challenge_expires_in_ms,
@@ -451,14 +449,12 @@ pub mod agent {
     pub async fn challenge(
         id: Principal,
         challenged_by: Principal,
-        code: ByteArrayB64<16>,
         info: AgentInfo,
         tee: Option<TEEInfo>,
+        code: ByteArrayB64<16>,
+        new_code: ByteArrayB64<16>,
         now_ms: u64,
     ) -> Result<(), RegistryError> {
-        let new_code = rand_bytes::<16>()
-            .await
-            .map_err(|error| RegistryError::Generic { error })?;
         INDEX.with_borrow_mut(|ri| {
             let (idx, challenged_at) =
                 ri.id_map
@@ -486,15 +482,21 @@ pub mod agent {
                     return Ok(());
                 }
 
-                if let Some((_, handle)) = &info.handle {
-                    ri.by_handle.insert(handle.clone(), *idx);
+                if info.handle != agent.info.handle {
+                    if let Some((_, handle)) = &agent.info.handle {
+                        ri.by_handle.remove(handle);
+                    }
+
+                    if let Some((_, handle)) = &info.handle {
+                        ri.by_handle.insert(handle.clone(), *idx);
+                    }
                 }
 
                 ri.by_health_power.remove(&(agent.health_power, *idx));
                 if now_ms > agent.challenged_expiration {
-                    // 之前的挑战已过期，进行惩罚
-                    // 1. 重置激活时间
-                    // 2. 减少健康权重
+                    // The previous challenge has expired, punish the agent
+                    // 1. Reset the activation time
+                    // 2. Reduce the health power
                     agent.actived_start = now_ms;
                     agent.health_power = agent
                         .health_power
@@ -522,7 +524,7 @@ pub mod agent {
                 }
 
                 *challenged_at = now_ms;
-                agent.challenge_code = new_code.into();
+                agent.challenge_code = new_code;
                 agent.info = info.into();
                 agent.tee = tee.map(|t| t.into());
                 agent.challenged_at = now_ms;
@@ -567,7 +569,10 @@ pub mod agent {
 
     pub fn list(prev: Option<u64>, take: usize) -> Result<(u64, Vec<Agent>), RegistryError> {
         let max_id = state::with(|s| s.max_agent);
-        let mut id = prev.unwrap_or(max_id).min(max_id);
+        let mut id = prev
+            .map(|v| v.saturating_sub(1))
+            .unwrap_or(max_id)
+            .min(max_id);
         AGENT_STORE.with_borrow(|ra| {
             let mut agents = Vec::with_capacity(take);
             loop {
@@ -619,5 +624,270 @@ pub mod agent {
             }
             Ok(rt)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ic_auth_types::ByteArrayB64;
+    use rand::Rng;
+
+    fn setup() {
+        STATE.with_borrow_mut(|s| {
+            s.name = "test_registry".to_string();
+            s.max_agent = 0;
+            s.challenge_expires_in_ms = 3600 * 1000; // 1 hour
+            s.peers = BTreeSet::new();
+            s.challengers = BTreeSet::new();
+            s.subscribers = BTreeSet::new();
+            s.name_canisters = BTreeSet::new();
+            s.governance_canister = None;
+        });
+
+        INDEX.with_borrow_mut(|i| {
+            i.id_map.clear();
+            i.by_handle.clear();
+            i.by_health_power.clear();
+            i.last_challenged.clear();
+            i.health_power_threshold = 0;
+        });
+
+        AGENT_STORE.with_borrow_mut(|a| {
+            // 清空存储
+            for key in a.iter().map(|(k, _)| k).collect::<Vec<_>>() {
+                a.remove(&key);
+            }
+        });
+    }
+
+    fn random_principal() -> Principal {
+        let mut rng = rand::rng();
+        let mut bytes = [0u8; 29];
+        rng.fill(&mut bytes);
+        Principal::from_slice(&bytes)
+    }
+
+    fn random_code() -> ByteArrayB64<16> {
+        let mut rng = rand::rng();
+        let mut bytes = [0u8; 16];
+        rng.fill(&mut bytes);
+        ByteArrayB64::from(bytes)
+    }
+
+    fn create_agent_info(handle: Option<String>) -> AgentInfo {
+        let handle_info = handle.map(|h| (random_principal(), h));
+        AgentInfo {
+            handle: handle_info,
+            name: "Test Agent".to_string(),
+            description: "Test Description".to_string(),
+            endpoint: "https://example.com".to_string(),
+            protocols: BTreeMap::new(),
+            payments: BTreeSet::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_register() {
+        setup();
+
+        let id = random_principal();
+        let challenger = random_principal();
+        let code = random_code();
+        let info = create_agent_info(Some("test_handle".to_string()));
+        let now_ms = 1000;
+
+        // 测试注册
+        let result =
+            agent::register(id, challenger, info.clone(), None, code.clone(), now_ms).await;
+        assert!(result.is_ok());
+
+        // 测试重复注册
+        let result =
+            agent::register(id, challenger, info.clone(), None, code.clone(), now_ms).await;
+        assert!(matches!(result, Err(RegistryError::AlreadyExists { .. })));
+
+        // 测试获取已注册的代理
+        let agent = agent::get_agent(id);
+        assert!(agent.is_ok());
+        let agent = agent.unwrap();
+        assert_eq!(agent.id, id);
+        assert_eq!(agent.health_power, 0);
+        assert_eq!(agent.challenged_at, now_ms);
+        assert_eq!(agent.challenged_by, challenger);
+        assert_eq!(agent.challenge_code, code);
+
+        // 测试通过句柄获取代理
+        if let Some((_, handle)) = &info.handle {
+            let agent_by_handle = agent::get_agent_by_handle(handle.clone());
+            assert!(agent_by_handle.is_ok());
+            assert_eq!(agent_by_handle.unwrap().id, id);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_challenge() {
+        setup();
+
+        let id = random_principal();
+        let challenger = random_principal();
+        let code = random_code();
+        let info = create_agent_info(Some("test_handle".to_string()));
+        let now_ms = 1000;
+
+        // 先注册代理
+        let result =
+            agent::register(id, challenger, info.clone(), None, code.clone(), now_ms).await;
+        assert!(result.is_ok());
+
+        // 测试挑战
+        let new_code = random_code();
+        let new_info = create_agent_info(Some("new_handle".to_string()));
+        let new_now_ms = 2000;
+
+        // 测试错误的挑战码
+        let wrong_code = random_code();
+        let result = agent::challenge(
+            id,
+            challenger,
+            new_info.clone(),
+            None,
+            wrong_code,
+            new_code.clone(),
+            new_now_ms,
+        )
+        .await;
+        assert!(matches!(result, Err(RegistryError::BadRequest { .. })));
+
+        // 测试正确的挑战码
+        let result = agent::challenge(
+            id,
+            challenger,
+            new_info.clone(),
+            None,
+            code,
+            new_code.clone(),
+            new_now_ms,
+        )
+        .await;
+        assert!(result.is_ok());
+
+        // 验证挑战后的状态
+        let agent = agent::get_agent(id).unwrap();
+        assert_eq!(agent.challenge_code, new_code);
+        assert_eq!(agent.challenged_at, new_now_ms);
+        assert_eq!(agent.health_power, new_now_ms - now_ms); // 健康值应该增加
+
+        // 测试通过新句柄获取代理
+        if let Some((_, handle)) = &new_info.handle {
+            let agent_by_handle = agent::get_agent_by_handle(handle.clone());
+            assert!(agent_by_handle.is_ok());
+            assert_eq!(agent_by_handle.unwrap().id, id);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_challenge_expired() {
+        setup();
+
+        let id = random_principal();
+        let challenger = random_principal();
+        let code = random_code();
+        let info = create_agent_info(Some("test_handle".to_string()));
+        let now_ms = 1000;
+
+        // 设置过期时间为1小时
+        STATE.with_borrow_mut(|s| {
+            s.challenge_expires_in_ms = 3600 * 1000;
+        });
+
+        // 先注册代理
+        let result =
+            agent::register(id, challenger, info.clone(), None, code.clone(), now_ms).await;
+        assert!(result.is_ok());
+
+        // 测试过期挑战（2小时后）
+        let new_code = random_code();
+        let new_info = create_agent_info(Some("new_handle".to_string()));
+        let new_now_ms = now_ms + 7200 * 1000; // 2小时后
+
+        // 挑战
+        let result = agent::challenge(
+            id,
+            challenger,
+            new_info.clone(),
+            None,
+            code,
+            new_code.clone(),
+            new_now_ms,
+        )
+        .await;
+        assert!(result.is_ok());
+
+        // 验证挑战后的状态
+        let agent = agent::get_agent(id).unwrap();
+        assert_eq!(agent.challenge_code, new_code);
+        assert_eq!(agent.challenged_at, new_now_ms);
+        assert_eq!(agent.actived_start, new_now_ms); // 激活时间应该重置
+        assert_eq!(agent.health_power, 0); // 健康值应该被扣减
+    }
+
+    #[tokio::test]
+    async fn test_list_functions() {
+        setup();
+
+        // 注册多个代理
+        let mut ids = Vec::new();
+        let challenger = random_principal();
+        let now_ms = 1000;
+
+        for i in 0..5 {
+            let id = random_principal();
+            ids.push(id);
+            let code = random_code();
+            let info = create_agent_info(Some(format!("handle_{}", i)));
+            let _ = agent::register(id, challenger, info, None, code, now_ms + i).await;
+        }
+
+        // 测试列表功能
+        let (last_id, agents) = agent::list(None, 3).unwrap();
+        assert_eq!(agents.len(), 3);
+        assert_eq!(last_id, 2);
+
+        let (last_id, agents) = agent::list(Some(2), 3).unwrap();
+        assert_eq!(agents.len(), 2);
+        assert_eq!(last_id, 0);
+
+        // 测试健康值列表
+        // 先进行一些挑战来增加健康值
+        for (i, id) in ids.iter().enumerate() {
+            if i % 2 == 0 {
+                let code = agent::get_agent(*id).unwrap().challenge_code;
+                let new_code = random_code();
+                let info = create_agent_info(Some(format!("handle_{}_updated", i)));
+                let new_now_ms = now_ms + 1000 + i as u64;
+                let _ =
+                    agent::challenge(*id, challenger, info, None, code, new_code, new_now_ms).await;
+            }
+        }
+
+        let agents = agent::list_by_health_power(10, now_ms + 10000).unwrap();
+        assert!(!agents.is_empty());
+
+        // 测试最近挑战列表
+        let last_challenged = agent::last_challenged(10).unwrap();
+        assert!(!last_challenged.is_empty());
+    }
+
+    #[test]
+    fn test_get_nonexistent_agent() {
+        setup();
+
+        let id = random_principal();
+        let result = agent::get_agent(id);
+        assert!(matches!(result, Err(RegistryError::NotFound { .. })));
+
+        let result = agent::get_agent_by_handle("nonexistent".to_string());
+        assert!(matches!(result, Err(RegistryError::NotFound { .. })));
     }
 }
