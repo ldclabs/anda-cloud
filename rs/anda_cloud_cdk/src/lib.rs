@@ -59,7 +59,7 @@ pub struct TEEInfo {
     pub kind: TEEKind,
 
     /// URL where additional TEE information can be retrieved.
-    /// (e.g. https://DOMAIN/.well-known/tee.json)
+    /// (e.g. https://DOMAIN/.well-known/tee)
     pub url: String,
 
     /// Optional attestation data that proves the TEE's authenticity.

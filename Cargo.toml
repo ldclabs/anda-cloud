@@ -25,7 +25,7 @@ serde_bytes = "0.11"
 serde_json = "1.0"
 sha3 = "0.10"
 ic-cdk = "0.18"
-ic-http-certification = "3.0"
+ic-http-certification = "3"
 ic-stable-structures = "0.6"
 ic_auth_types = { version = "0.4" }
 ic_auth_verifier = { version = "0.4" }

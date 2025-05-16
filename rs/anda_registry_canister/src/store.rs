@@ -6,6 +6,7 @@ use anda_cloud_cdk::{
 use candid::{CandidType, Principal};
 use ciborium::{from_reader, into_writer};
 use ic_auth_types::ByteArrayB64;
+use ic_cdk::call::Call;
 use ic_http_certification::{
     HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpCertificationTreeEntry,
     cel::{DefaultCelBuilder, create_cel_expr},
@@ -21,8 +22,6 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
 };
-
-use crate::{call, notify};
 
 const MAX_LAST_CHALLENGED: usize = 10000;
 const MAX_HEALTH_POWER_LIST: usize = 1000;
@@ -362,7 +361,9 @@ pub mod state {
 
         ic_cdk::futures::spawn(async move {
             for subscriber in subscribers {
-                let _ = notify(subscriber, AGENT_EVENT_API, &event).await;
+                let _ = Call::unbounded_wait(subscriber, AGENT_EVENT_API)
+                    .with_arg(&event)
+                    .oneway();
             }
         });
     }
@@ -382,9 +383,17 @@ pub mod state {
         })?;
 
         // https://github.com/ldclabs/ic-panda/blob/main/src/ic_message/src/api_query.rs#L83
-        let rt: Result<UserInfo, String> = call(canister, "get_by_username", &(handle.clone(),), 0)
+        let rt: Result<UserInfo, String> = Call::bounded_wait(canister, "get_by_username")
+            .with_arg(&handle)
+            .change_timeout(10)
             .await
-            .map_err(|error| RegistryError::Generic { error })?;
+            .map_err(|err| RegistryError::Generic {
+                error: format!("{err:?}"),
+            })?
+            .candid()
+            .map_err(|err| RegistryError::Generic {
+                error: format!("{err:?}"),
+            })?;
 
         if let Ok(user) = rt {
             if user.id == owner {

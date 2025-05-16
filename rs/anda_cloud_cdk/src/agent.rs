@@ -75,7 +75,7 @@ pub struct AgentInfo {
 
     /// The protocols the agent supports. It is a map of protocol name to
     /// agent information.
-    /// (e.g. "ANDA" => "https://DOMAIN/.well-known/agents/{agent_id}.json"，
+    /// (e.g. "ANDA" => "https://DOMAIN/.well-known/agents/{agent_id}"，
     ///       "A2A" => "https://DOMAIN/.well-known/agent.json")
     pub protocols: BTreeMap<AgentProtocol, String>,
 
@@ -254,7 +254,7 @@ impl ChallengeEnvelope {
     Clone, Debug, CandidType, Deserialize, Serialize, Eq, PartialEq, Hash, Ord, PartialOrd,
 )]
 pub enum AgentProtocol {
-    /// Anda Network Decentralized Agent protocol, https://github.com/ldclabs/anda
+    /// Autonomous Networked Decentralized Agent protocol, https://github.com/ldclabs/anda
     ANDA,
     /// Agent2Agent protocol, https://github.com/google/A2A
     A2A,

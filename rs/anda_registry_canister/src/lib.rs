@@ -2,7 +2,7 @@ use anda_cloud_cdk::{
     agent::{Agent, ChallengeEnvelope},
     registry::{RegistryError, RegistryState},
 };
-use candid::{CandidType, Principal, utils::ArgumentEncoder};
+use candid::Principal;
 use std::collections::{BTreeMap, BTreeSet};
 
 mod api;
@@ -34,34 +34,6 @@ fn validate_principals(principals: &BTreeSet<Principal>) -> Result<(), String> {
         return Err("anonymous user is not allowed".to_string());
     }
     Ok(())
-}
-
-async fn call<In, Out>(id: Principal, method: &str, args: &In, cycles: u128) -> Result<Out, String>
-where
-    In: ArgumentEncoder + Send,
-    Out: candid::CandidType + for<'a> candid::Deserialize<'a>,
-{
-    let res = ic_cdk::call::Call::bounded_wait(id, method)
-        .with_args(args)
-        .with_cycles(cycles)
-        .await
-        .map_err(|err| format!("failed to call {} on {:?}, error: {:?}", method, &id, err))?;
-    res.candid().map_err(|err| {
-        format!(
-            "failed to decode response from {} on {:?}, error: {:?}",
-            method, &id, err
-        )
-    })
-}
-
-async fn notify<In>(id: Principal, method: &str, arg: &In) -> Result<(), String>
-where
-    In: CandidType,
-{
-    ic_cdk::call::Call::unbounded_wait(id, method)
-        .with_arg(arg)
-        .oneway()
-        .map_err(|err| format!("failed to call {} on {:?}, error: {:?}", method, &id, err))
 }
 
 async fn rand_bytes<const N: usize>() -> Result<[u8; N], String> {
