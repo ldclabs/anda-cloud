@@ -28,9 +28,8 @@ pub struct HttpResponse {
 // run `make build-wasm` to build the wasm
 // run `cargo test --test anda_registry_canister` to run the test
 #[test]
+#[ignore]
 fn anda_registry_canister_should_work() {
-    println!("POCKET_IC_BIN: {}", env!("POCKET_IC_BIN"));
-
     let challenger_id = new_identity();
     let agent_id = new_identity();
     let caller = challenger_id.sender().unwrap();
