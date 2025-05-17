@@ -1,0 +1,70 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - name: Build canisters
+      run: |
+        rustup target add wasm32-unknown-unknown
+        cargo install ic-wasm
+        mkdir -p out
+        cargo build --target wasm32-unknown-unknown --release --locked -p anda_registry_canister
+        for CAN in anda_registry_canister
+        do
+          cp "target/wasm32-unknown-unknown/release/$CAN.wasm" out/
+          cp "src/$CAN/$CAN.did" "out/$CAN.did"
+          WASM="out/$CAN.wasm"
+          ic-wasm $WASM -o $WASM metadata candid:service -f "out/$CAN.did" -v public
+          ic-wasm $WASM -o $WASM shrink
+          ic-wasm $WASM -o $WASM optimize O3 --inline-functions-with-loops
+          gzip $WASM
+          SHA256="$(sha256sum < "out/$CAN.wasm.gz" | sed 's/ .*$//g')"
+          echo $SHA256 > "out/$CAN.wasm.gz.$SHA256.txt"
+        done
+        ls -lah out
+    - name: Upload wasm artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: wasm-artifacts
+        path: out/*
+  build-binary:
+    runs-on: ubuntu-latest
+    container: clux/muslrust:stable
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - name: Build linux binary
+      run: |
+        mkdir -p out
+        ls -lah out
+    - name: Upload binary artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binary-artifacts
+        path: out/*
+  release:
+    runs-on: ubuntu-latest
+    needs: [build-wasm, build-binary]
+    steps:
+    - name: Download wasm artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: wasm-artifacts
+        path: out-wasm
+    - name: Download binary artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: binary-artifacts
+        path: out-binary
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          out-wasm/*
+          out-binary/*
