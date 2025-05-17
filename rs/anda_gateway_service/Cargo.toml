@@ -1,0 +1,37 @@
+[package]
+name = "anda_gateway_service"
+description = "A TEE-based gateway that bridges external AI Agents (using MCP/A2A) with the ANDA ecosystem."
+repository = "https://github.com/ldclabs/anda-cloud/tree/main/src/anda_gateway_service"
+publish = false
+version.workspace = true
+edition.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anda_cloud_cdk = { path = "../anda_cloud_cdk", version = "0.1" }
+base64 = { workspace = true }
+candid = { workspace = true, features = ["value", "printer"] }
+ciborium = { workspace = true }
+ic-cdk = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
+ic-stable-structures = { workspace = true }
+ic-http-certification = { workspace = true }
+ic_auth_types = { workspace = true }
+ic_tee_nitro_attestation = { workspace = true }
+lazy_static = { workspace = true }
+once_cell = { workspace = true }
+url = { workspace = true }
+ic-dummy-getrandom-for-wasm = "0.1"
+
+[dev-dependencies]
+rand = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
