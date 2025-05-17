@@ -3,18 +3,27 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use candid::{CandidType, Principal};
 use ciborium::from_reader;
 use ic_http_certification::{HeaderField, HttpRequest, HttpUpdateRequest};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use url::Url;
 
 use crate::{api, store};
 
-#[derive(CandidType, Deserialize, Clone, Default)]
+#[derive(CandidType, Deserialize, Serialize, Clone, Default)]
 pub struct HttpResponse {
     pub status_code: u16,
     pub headers: Vec<HeaderField>,
     pub body: ByteBuf,
+    pub upgrade: Option<bool>,
 }
+
+// type HttpResponse = record {
+//     status_code: nat16;
+//     headers: vec HeaderField;
+//     body: blob;
+//     upgrade : opt bool;
+//     streaming_strategy: opt StreamingStrategy;
+// };
 
 static CBOR: &str = "application/cbor";
 static JSON: &str = "application/json";
@@ -60,6 +69,7 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
                 status_code: 400,
                 headers,
                 body: err.into_bytes().into(),
+                upgrade: None,
             };
         }
     };
@@ -87,6 +97,7 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
                 status_code: 200,
                 headers,
                 body: body.into(),
+                upgrade: None,
             }
         }
         Err(err) => {
@@ -95,6 +106,7 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
                 status_code: err.status_code(),
                 headers,
                 body: err.to_string().into_bytes().into(),
+                upgrade: None,
             }
         }
     }
@@ -102,31 +114,7 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
 
 #[ic_cdk::update(hidden = true)]
 async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpResponse {
-    let witness = store::state::http_tree_with(|t| {
-        t.witness(&store::state::DEFAULT_CERT_ENTRY, request.url())
-            .expect("get witness failed")
-    });
-
-    let certified_data = ic_cdk::api::data_certificate().expect("no data certificate available");
-
-    let mut headers = vec![
-        ("x-content-type-options".to_string(), "nosniff".to_string()),
-        (
-            IC_CERTIFICATE_EXPRESSION_HEADER.to_string(),
-            store::state::DEFAULT_CEL_EXPR.clone(),
-        ),
-        (
-            IC_CERTIFICATE_HEADER.to_string(),
-            format!(
-                "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
-                BASE64.encode(certified_data),
-                BASE64.encode(to_cbor_bytes(&witness)),
-                BASE64.encode(to_cbor_bytes(
-                    &store::state::DEFAULT_EXPR_PATH.to_expr_path()
-                ))
-            ),
-        ),
-    ];
+    let mut headers = vec![("x-content-type-options".to_string(), "nosniff".to_string())];
 
     let req_url = match parse_url(request.url()) {
         Ok(url) => url,
@@ -135,6 +123,7 @@ async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpRespons
                 status_code: 400,
                 headers,
                 body: err.into_bytes().into(),
+                upgrade: None,
             };
         }
     };
@@ -161,6 +150,7 @@ async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpRespons
                 status_code: 200,
                 headers,
                 body: body.into(),
+                upgrade: None,
             }
         }
         Err(err) => {
@@ -169,6 +159,7 @@ async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpRespons
                 status_code: err.status_code(),
                 headers,
                 body: err.to_string().into_bytes().into(),
+                upgrade: None,
             }
         }
     }

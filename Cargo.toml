@@ -25,6 +25,7 @@ serde_bytes = "0.11"
 serde_json = "1.0"
 sha3 = "0.10"
 ic-cdk = "0.18"
+ic-agent = "0.40"
 ic-http-certification = "3"
 ic-stable-structures = "0.6"
 ic_auth_types = { version = "0.4" }
@@ -36,6 +37,8 @@ url = "2.5"
 thiserror = "2"
 rand = "0.9"
 tokio = { version = "1" }
+pocket-ic = "9"
+ed25519-consensus = "2.1"
 
 [workspace.metadata.cargo-shear]
 ignored = ["ic-dummy-getrandom-for-wasm"]

@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 /// The Registry Canister is responsible for managing agent registrations,
 /// maintaining a list of authorized challengers, and coordinating with
 /// other registry canisters in a distributed network.
-#[derive(Clone, CandidType, Default, Deserialize, Serialize)]
+#[derive(Clone, CandidType, Default, Debug, Deserialize, Serialize)]
 pub struct RegistryState {
     /// The name of this registry instance.
     pub name: String,
@@ -47,7 +47,7 @@ pub struct RegistryState {
 ///
 /// This enum provides specific error types with associated messages
 /// to help diagnose and handle different failure scenarios.
-#[derive(CandidType, Debug, Deserialize, Serialize, thiserror::Error)]
+#[derive(CandidType, Debug, Deserialize, Serialize, thiserror::Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum RegistryError {
     /// A generic error with a descriptive message.

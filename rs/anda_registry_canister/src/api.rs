@@ -46,7 +46,7 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
             })?;
 
     let challenger = challenger_auth.sender();
-    if store::state::is_challenger(&challenger) {
+    if !store::state::is_challenger(&challenger) {
         return Err(RegistryError::Forbidden {
             error: format!("challenger {} has no permission", challenger),
         });
@@ -139,7 +139,7 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
             })?;
 
     let challenger = challenger_auth.sender();
-    if store::state::is_challenger(&challenger) {
+    if !store::state::is_challenger(&challenger) {
         return Err(RegistryError::Forbidden {
             error: format!("challenger {} has no permission", challenger),
         });

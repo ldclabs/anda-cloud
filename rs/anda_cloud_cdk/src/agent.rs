@@ -55,7 +55,7 @@ pub struct Agent {
 ///
 /// This structure holds the metadata and configuration details that define
 /// an agent's capabilities, endpoints, and supported protocols.
-#[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, CandidType, Deserialize, Serialize)]
 pub struct AgentInfo {
     /// Unique account identifier of the agent on dMsg.net.
     pub handle: Option<(Principal, String)>,
