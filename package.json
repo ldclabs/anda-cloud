@@ -1,0 +1,17 @@
+{
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "name": "anda-cloud",
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "prebuild": "npm run prebuild --workspaces --if-present",
+    "pretest": "npm run prebuild --workspaces --if-present",
+    "start": "npm start --workspaces --if-present",
+    "test": "npm test --workspaces --if-present"
+  },
+  "type": "module",
+  "workspaces": [
+    "ts/anda_cloud_website"
+  ]
+}

@@ -14,6 +14,17 @@
       "package": "anda_registry_canister",
       "optimize": "cycles",
       "type": "rust"
+    },
+    "anda_cloud_website": {
+      "dependencies": [],
+      "build": [
+        "echo 'Disable dfx build for anda_cloud_website'"
+      ],
+      "source": [
+        "ts/anda_cloud_website/static"
+      ],
+      "type": "assets",
+      "workspace": "anda_cloud_website"
     }
   },
   "defaults": {

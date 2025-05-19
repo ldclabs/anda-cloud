@@ -12,10 +12,10 @@ use ic_auth_verifier::envelope::SignedEnvelope;
 use ic_http_certification::{HeaderField, HttpRequest, Method};
 use ic_stable_structures::Storable;
 use pocket_ic::{PocketIc, PocketIcBuilder};
-use rand::{CryptoRng, Rng, RngCore};
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
-use std::{collections::BTreeMap, env, ops::Add, path::Path, time::Duration};
+use std::{collections::BTreeMap, ops::Add, path::Path, time::Duration};
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Default)]
 pub struct HttpResponse {
@@ -327,12 +327,6 @@ fn load_canister_wasm(name: &str) -> Vec<u8> {
     let wasm_path = Path::new(&wasm_path_string);
     std::fs::read(wasm_path)
         .expect("wasm does not exist - run `cargo build --release --target wasm32-unknown-unknown`")
-}
-
-pub fn random_self_authenticating_principal<R: Rng + CryptoRng>(rng: &mut R) -> Principal {
-    let mut fake_public_key = vec![0u8; 32];
-    rng.fill_bytes(&mut fake_public_key);
-    Principal::self_authenticating::<&[u8]>(fake_public_key.as_ref())
 }
 
 fn fast_forward(ic: &PocketIc, ticks: u64) {

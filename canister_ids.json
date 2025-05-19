@@ -1,4 +1,11 @@
 {
+  "__Candid_UI": {
+    "local": "bnz7o-iuaaa-aaaaa-qaaaa-cai"
+  },
+  "anda_cloud_website": {
+    "ic": "lxeb6-dyaaa-aaaap-an2ga-cai",
+    "local": "lxeb6-dyaaa-aaaap-an2ga-cai"
+  },
   "anda_registry_canister": {
     "ic": "lfcwh-piaaa-aaaap-an2fa-cai"
   }
