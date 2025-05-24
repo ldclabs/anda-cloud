@@ -95,10 +95,9 @@ body {
 
 /* 容器 */
 .container {
-    width: 90%;
-    max-width: 1200px;
+    max-width: 1024px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 40px;
 }
 
 /* 标题和文本 */
@@ -336,19 +335,6 @@ a:hover {
     border-radius: 8px;
     border: 1px solid rgba(123, 0, 255, 0.3);
     box-shadow: 0 0 10px rgba(123, 0, 255, 0.5);
-}
-
-@media (max-width: 768px) {
-    .hero .container {
-        flex-direction: column-reverse;
-    }
-    .hero-content, .hero-visual {
-        max-width: 100%;
-    }
-
-    .hero {
-        padding-top: 120px;
-    }
 }
 
 .subhead {
@@ -765,24 +751,6 @@ section {
 }
 
 /* 响应式设计 */
-@media (max-width: 1200px) {
-    .hero-visual {
-        right: -200px;
-    }
-}
-
-@media (max-width: 992px) {
-    .hero-content {
-        max-width: 100%;
-        text-align: center;
-        margin: 0 auto;
-    }
-
-    .hero-cta {
-        justify-content: center;
-    }
-}
-
 @media (max-width: 768px) {
     h1 {
         font-size: 2.25rem;
@@ -792,8 +760,23 @@ section {
         font-size: 1.875rem;
     }
 
+    section {
+        padding: 40px 0;
+    }
+
     .nav ul {
         display: none;
+    }
+
+    .hero .container {
+        flex-direction: column-reverse;
+    }
+    .hero-content, .hero-visual {
+        max-width: 100%;
+    }
+
+    .hero {
+        padding-top: 120px;
     }
 
     .footer-content {
@@ -820,10 +803,14 @@ section {
     }
 }
 
-@media (max-width: 576px) {
+@media (max-width: 640px) {
     .btn {
         padding: 10px 20px;
         font-size: 0.875rem;
+    }
+
+    .container {
+        padding: 0 20px;
     }
 
     .section-title {
