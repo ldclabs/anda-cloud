@@ -82,15 +82,15 @@ body {
 }
 
 #anda-poetry {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -2;
-  overflow: hidden;
-  background-color: transparent;
-  filter: blur(0.3px);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    overflow: hidden;
+    background-color: transparent;
+    filter: blur(0.3px);
 }
 
 /* 容器 */
@@ -328,19 +328,27 @@ a:hover {
 }
 
 .hero-visual video {
-  float: right;
-  max-width: 400px;
-  width: 100%;
-  height: auto;
+    float: right;
+    max-width: 400px;
+    width: 100%;
+    height: auto;
+    background: rgba(123, 0, 255, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(123, 0, 255, 0.3);
+    box-shadow: 0 0 10px rgba(123, 0, 255, 0.5);
 }
 
 @media (max-width: 768px) {
-  .hero .container {
-      flex-direction: column-reverse;
-  }
-  .hero-content, .hero-visual {
-      max-width: 100%;
-  }
+    .hero .container {
+        flex-direction: column-reverse;
+    }
+    .hero-content, .hero-visual {
+        max-width: 100%;
+    }
+
+    .hero {
+        padding-top: 120px;
+    }
 }
 
 .subhead {
@@ -516,23 +524,6 @@ section {
 .icon {
     margin-right: 10px;
     font-size: 1.875rem;
-}
-
-.digital-lifeform {
-    text-align: center;
-    font-size: 1.25rem;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 30px;
-    background: rgba(123, 0, 255, 0.1);
-    border-radius: 15px;
-    border: 1px solid rgba(123, 0, 255, 0.3);
-}
-
-.digital-lifeform em {
-    color: var(--secondary);
-    font-style: normal;
-    font-weight: 700;
 }
 
 /* Ecosystem 部分 */
