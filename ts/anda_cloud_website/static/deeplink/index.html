@@ -6,20 +6,90 @@
   <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport" />
   <title>Anda.AI - Build the Future of AI Agents</title>
   <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/_assets/css/landing.css">
+  <style>
+    .logo {
+      transform: scale(1.6) translateY(-20px);
+    }
+
+    .redirect {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      max-width: 480px;
+      text-align: center;
+      gap: 20px;
+    }
+
+    .status {
+      font-size: 1.25rem;
+    }
+
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-top: 20px;
+      gap: 20px;
+    }
+
+    .buttons .btn {
+      width: fit-content;
+    }
+  </style>
 </head>
 
 <body>
-  <h1>Anda.AI - Build the Future of AI Agents</h1>
-  <a href="https://anda.ai">Anda.AI desktop app is not installed. Please install the desktop app to use this
-    feature.</a>
+  <canvas id="anda-poetry"></canvas>
+  <div class="stars-container">
+    <div id="stars"></div>
+    <div id="stars2"></div>
+    <div id="stars3"></div>
+  </div>
+
+  <div class="container redirect">
+    <div class="logo">
+      <img src="/_assets/images/logo.svg" alt="Anda.AI Logo"><span>Anda.AI</span>
+    </div>
+
+    <div class="status">
+      <div class="spinner"></div>
+      <span class="status-text">Launching your AI Agent assistant...</span>
+    </div>
+
+    <div class="buttons">
+      <a href="https://anda.ai" class="btn btn-primary">Visit Website</a>
+      <button onclick="window.close()" class="btn btn-secondary">Close Window</button>
+    </div>
+  </div>
+
   <script>
-    // redirect the deeplink request to the desktop app
-    try {
-      window.location.assign(window.location.href.replace(/^.*deeplink/i, "anda://deeplink"))
-    } catch (err) {
-      console.error("Error redirecting to desktop app:", err)
-    }
+    const statusElement = document.querySelector('.status-text')
+    const nextUrl = window.location.href.replace(/^.*deeplink/i, "anda://deeplink")
+    setTimeout(() => {
+      try {
+        window.location.assign(nextUrl)
+
+        setTimeout(() => {
+          statusElement.textContent = 'If the app did not launch automatically, please open the Anda.AI app manually'
+        }, 5000)
+
+      } catch (err) {
+        console.error("Error redirecting to desktop app:", err)
+        statusElement.textContent = 'Unable to launch the app automatically. Please open Anda.AI manually or visit our website for help'
+      }
+    }, 100)
   </script>
+  <script src="/_assets/js/landing.js"></script>
+
 </body>
 
 </html>

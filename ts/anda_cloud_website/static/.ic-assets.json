@@ -12,6 +12,22 @@
         "ignore": false
     },
     {
+        "match": ".well-known/apple-app-site-association",
+        "headers": {
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "application/json"
+        },
+        "ignore": false
+    },
+    {
+        "match": ".well-known/assetlinks.json",
+        "headers": {
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "application/json"
+        },
+        "ignore": false
+    },
+    {
         "match": "**/*",
         "security_policy": "standard",
         "headers": {

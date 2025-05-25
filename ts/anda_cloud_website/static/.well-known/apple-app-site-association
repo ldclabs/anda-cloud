@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "S9Z2WAMAV8.ai.anda.app"
+        ],
+        "components": [
+          {
+            "/": "/deeplink/*",
+            "comment": "Matches any URL whose path starts with /deeplink/"
+          }
+        ]
+      }
+    ]
+  }
+}
