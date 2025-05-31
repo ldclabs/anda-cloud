@@ -36,6 +36,7 @@ export interface ChallengeRequest {
   'authentication' : [] | [SignedEnvelope],
   'agent' : AgentInfo,
   'code' : Uint8Array | number[],
+  'created_at' : bigint,
   'registry' : Principal,
 }
 export interface DelegationCompact {

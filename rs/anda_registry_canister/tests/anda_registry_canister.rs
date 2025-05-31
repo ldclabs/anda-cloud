@@ -8,7 +8,7 @@ use candid::{
 };
 use ed25519_consensus::SigningKey;
 use ic_agent::{Identity, identity::BasicIdentity};
-use ic_auth_verifier::envelope::SignedEnvelope;
+use ic_auth_verifier::envelope::{SignedEnvelope, unix_ms};
 use ic_http_certification::{HeaderField, HttpRequest, Method};
 use ic_stable_structures::Storable;
 use pocket_ic::{PocketIc, PocketIcBuilder};
@@ -53,6 +53,7 @@ fn anda_registry_canister_should_work() {
             )]),
             ..Default::default()
         },
+        created_at: unix_ms(),
         authentication: None,
     };
     let digest = request.core_digest();
@@ -79,6 +80,7 @@ fn anda_registry_canister_should_work() {
     assert!(rt.is_ok());
 
     let rt: Result<(), RegistryError> = can.update(caller, "register", &(&envelope,));
+    println!("Register result: {:?}", rt);
     assert!(rt.is_ok());
 
     let rt: Result<Agent, RegistryError> =
@@ -111,6 +113,7 @@ fn anda_registry_canister_should_work() {
                 )]),
                 ..Default::default()
             },
+            created_at: unix_ms(),
             authentication: None,
         };
         let digest = request.core_digest();
@@ -146,6 +149,7 @@ fn anda_registry_canister_should_work() {
                 )]),
                 ..Default::default()
             },
+            created_at: unix_ms(),
             authentication: None,
         };
         let digest = request.core_digest();
@@ -209,6 +213,7 @@ fn anda_registry_canister_should_work() {
                     )]),
                     ..Default::default()
                 },
+                created_at: unix_ms(),
                 authentication: None,
             };
             let digest = request.core_digest();

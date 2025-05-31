@@ -3,9 +3,15 @@ use ic_auth_types::ByteArrayB64;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{PaymentProtocol, SignedEnvelope, TEEInfo, sha3_256, to_cbor_bytes};
+use crate::{PaymentProtocol, RegistryError, SignedEnvelope, TEEInfo, sha3_256, to_cbor_bytes};
 
 pub const ZERO_CHALLENGE_CODE: ByteArrayB64<16> = ByteArrayB64([0u8; 16]);
+
+/// Maximum allowed time drift in milliseconds for delegation verification.
+/// This prevents replay attacks while allowing for reasonable clock differences.
+pub const PERMITTED_DRIFT_MS: u64 = 60 * 1000;
+
+pub const CHALLENGE_EXPIRES_IN_MS: u64 = 1000 * 60 * 5; // 5 minute
 
 /// Represents an AI agent registration information in the Anda network system.
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
@@ -155,22 +161,23 @@ pub struct ChallengeRequest {
     /// effectively synchronizing the agent's information through the challenge process.
     pub agent: AgentInfo,
 
+    /// Creation timestamp of the challenge request in milliseconds since the Unix epoch.
+    pub created_at: u64,
+
     /// Authentication signature information from the challenger.
     /// The challenger must be registered in the Anda Registry Canister, otherwise the challenge will fail.
     pub authentication: Option<SignedEnvelope>,
 }
 
-impl ChallengeRequest {
-    /// Validates the challenge request by ensuring the agent information is valid.
-    ///
-    /// # Returns
-    /// - `Ok(())` if validation passes
-    /// - `Err(String)` with a descriptive error message if validation fails
-    pub fn validate(&self) -> Result<(), String> {
-        self.agent.validate()?;
-        Ok(())
-    }
+#[derive(Debug, Serialize)]
+struct ChallengeRequestCoreRef<'a> {
+    registry: &'a Principal,
+    code: &'a ByteArrayB64<16>,
+    agent: &'a AgentInfo,
+    created_at: u64,
+}
 
+impl ChallengeRequest {
     /// Computes a digest (hash) of the challenge request's core components.
     ///
     /// The digest includes the registry, code, and agent information.
@@ -178,7 +185,12 @@ impl ChallengeRequest {
     /// # Returns
     /// - A 32-byte array containing the SHA3-256 hash of the serialized data
     pub fn core_digest(&self) -> [u8; 32] {
-        let data = to_cbor_bytes(&(&self.registry, &self.code, &self.agent));
+        let data = to_cbor_bytes(&ChallengeRequestCoreRef {
+            registry: &self.registry,
+            code: &self.code,
+            agent: &self.agent,
+            created_at: self.created_at,
+        });
         sha3_256(&data)
     }
 
@@ -189,13 +201,53 @@ impl ChallengeRequest {
     /// # Returns
     /// - A 32-byte array containing the SHA3-256 hash of the serialized data
     pub fn digest(&self) -> [u8; 32] {
-        let data = to_cbor_bytes(&(
-            &self.registry,
-            &self.code,
-            &self.agent,
-            &self.authentication,
-        ));
+        let data = to_cbor_bytes(&self);
         sha3_256(&data)
+    }
+
+    /// Validates the challenge request by ensuring the agent information is valid.
+    ///
+    /// # Returns
+    /// - `Ok(())` if validation passes
+    /// - `Err(String)` with a descriptive error message if validation fails
+    pub fn validate(&self, now_ms: u64, registry: &Principal) -> Result<(), String> {
+        self.agent.validate()?;
+        if self.created_at + CHALLENGE_EXPIRES_IN_MS + PERMITTED_DRIFT_MS < now_ms {
+            return Err(format!(
+                "challenge request is too old, created_at: {}, now: {}",
+                self.created_at, now_ms
+            ));
+        }
+        if self.created_at > now_ms + PERMITTED_DRIFT_MS {
+            return Err(format!(
+                "challenge request is in the future, created_at: {}, now: {}",
+                self.created_at, now_ms
+            ));
+        }
+        if self.registry != *registry {
+            return Err(format!(
+                "challenge request is for a different registry, expected: {}, got: {}",
+                registry, self.registry
+            ));
+        }
+        Ok(())
+    }
+
+    /// Verifies the challenge request by validating its components and authentication.
+    pub fn verify(&self, now_ms: u64, registry: Principal) -> Result<(), RegistryError> {
+        self.validate(now_ms, &registry)
+            .map_err(|error| RegistryError::BadRequest { error })?;
+
+        let digest = self.core_digest();
+        if let Some(auth) = &self.authentication {
+            auth.verify(now_ms, Some(registry), Some(&digest))
+                .map_err(|error| RegistryError::Unauthorized { error })?;
+        } else {
+            return Err(RegistryError::BadRequest {
+                error: "challenger authentication is not provided".to_string(),
+            });
+        }
+        Ok(())
     }
 }
 
@@ -232,16 +284,21 @@ pub struct ChallengeEnvelope {
 }
 
 impl ChallengeEnvelope {
-    /// Validates the agent envelope by checking the challenge and TEE information.
-    ///
-    /// # Returns
-    /// - `Ok(())` if validation passes
-    /// - `Err(String)` with a descriptive error message if validation fails
-    pub fn validate(&self) -> Result<(), String> {
-        self.request.validate()?;
+    /// Verifies the challenge envelope by validating its components and authentication.
+    /// The tee attestation is not verified if present. It should be verified separately.
+    pub fn verify(&self, now_ms: u64, registry: Principal) -> Result<(), RegistryError> {
         if let Some(tee) = &self.tee {
-            tee.validate()?;
+            tee.validate()
+                .map_err(|error| RegistryError::BadRequest { error })?;
         }
+
+        self.request.verify(now_ms, registry)?;
+
+        let digest = self.request.digest();
+        self.authentication
+            .verify(now_ms, Some(registry), Some(&digest))
+            .map_err(|error| RegistryError::Unauthorized { error })?;
+
         Ok(())
     }
 }

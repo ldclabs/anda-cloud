@@ -33,6 +33,7 @@ module {
     authentication : ?SignedEnvelope;
     agent : AgentInfo;
     code : Blob;
+    created_at : Nat64;
     registry : Principal;
   };
   public type DelegationCompact = { e : Nat64; p : Blob; t : ?[Principal] };

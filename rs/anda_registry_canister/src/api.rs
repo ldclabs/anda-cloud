@@ -1,5 +1,5 @@
 use anda_cloud_cdk::{
-    agent::{Agent, AgentEvent, AgentEventKind, ChallengeEnvelope, ZERO_CHALLENGE_CODE},
+    agent::{Agent, AgentEvent, AgentEventKind, ChallengeEnvelope},
     registry::{RegistryError, RegistryState},
 };
 use candid::Principal;
@@ -15,50 +15,17 @@ fn get_state() -> Result<RegistryState, RegistryError> {
 
 #[ic_cdk::update]
 pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
-    input
-        .validate()
-        .map_err(|error| RegistryError::BadRequest { error })?;
     let now_ms = ic_cdk::api::time() / MILLISECONDS;
-    let agent_id = input.authentication.sender();
-    if input.request.code != ZERO_CHALLENGE_CODE {
-        return Err(RegistryError::BadRequest {
-            error: "challenge code is not empty".to_string(),
-        });
-    }
-
     let canister_self = ic_cdk::api::canister_self();
-    if input.request.registry != canister_self {
-        return Err(RegistryError::BadRequest {
-            error: format!(
-                "challenge registry is not this canister, expect {}, got {}",
-                canister_self, input.request.registry
-            ),
-        });
-    }
-    let digest = input.request.core_digest();
-    let full_digest = input.request.digest();
-    let challenger_auth =
-        input
-            .request
-            .authentication
-            .ok_or_else(|| RegistryError::BadRequest {
-                error: "challenger authentication is not provided".to_string(),
-            })?;
+    input.verify(now_ms, canister_self)?;
 
-    let challenger = challenger_auth.sender();
+    let agent = input.authentication.sender();
+    let challenger = input.request.authentication.unwrap().sender();
     if !store::state::is_challenger(&challenger) {
         return Err(RegistryError::Forbidden {
             error: format!("challenger {} has no permission", challenger),
         });
     }
-
-    challenger_auth
-        .verify(now_ms, Some(canister_self), Some(&digest))
-        .map_err(|error| RegistryError::Unauthorized { error })?;
-    input
-        .authentication
-        .verify(now_ms, Some(canister_self), Some(&full_digest))
-        .map_err(|error| RegistryError::Unauthorized { error })?;
 
     if let Some(tee) = &input.tee {
         let attestation = parse_and_verify(tee.attestation.as_ref().ok_or_else(|| {
@@ -85,14 +52,14 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
     }
 
     if let Some((canister, handle)) = &input.request.agent.handle {
-        store::state::check_handle(*canister, handle.clone(), agent_id).await?;
+        store::state::check_handle(*canister, handle.clone(), agent).await?;
     }
 
     let code = rand_bytes::<16>()
         .await
         .map_err(|error| RegistryError::Generic { error })?;
     store::agent::register(
-        agent_id,
+        agent,
         challenger,
         input.request.agent,
         input.tee,
@@ -102,7 +69,7 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
     .await?;
 
     store::state::notify_subscribers(AgentEvent {
-        id: agent_id,
+        id: agent,
         kind: AgentEventKind::Registered,
         ts: now_ms,
     });
@@ -112,46 +79,17 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
 
 #[ic_cdk::update]
 pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
-    input
-        .validate()
-        .map_err(|error| RegistryError::BadRequest { error })?;
-
     let now_ms = ic_cdk::api::time() / MILLISECONDS;
-
-    let agent_id = input.authentication.sender();
     let canister_self = ic_cdk::api::canister_self();
-    if input.request.registry != canister_self {
-        return Err(RegistryError::BadRequest {
-            error: format!(
-                "challenge registry is not this canister, expect {}, got {}",
-                canister_self, input.request.registry
-            ),
-        });
-    }
-    let digest = input.request.core_digest();
-    let full_digest = input.request.digest();
-    let challenger_auth =
-        input
-            .request
-            .authentication
-            .ok_or_else(|| RegistryError::BadRequest {
-                error: "challenger authentication is not provided".to_string(),
-            })?;
+    input.verify(now_ms, canister_self)?;
 
-    let challenger = challenger_auth.sender();
+    let agent = input.authentication.sender();
+    let challenger = input.request.authentication.unwrap().sender();
     if !store::state::is_challenger(&challenger) {
         return Err(RegistryError::Forbidden {
             error: format!("challenger {} has no permission", challenger),
         });
     }
-
-    challenger_auth
-        .verify(now_ms, Some(canister_self), Some(&digest))
-        .map_err(|error| RegistryError::Unauthorized { error })?;
-    input
-        .authentication
-        .verify(now_ms, Some(canister_self), Some(&full_digest))
-        .map_err(|error| RegistryError::Unauthorized { error })?;
 
     if let Some(tee) = &input.tee {
         let attestation = parse_and_verify(tee.attestation.as_ref().ok_or_else(|| {
@@ -178,14 +116,14 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
     }
 
     if let Some((canister, handle)) = &input.request.agent.handle {
-        store::state::check_handle(*canister, handle.clone(), agent_id).await?;
+        store::state::check_handle(*canister, handle.clone(), agent).await?;
     }
 
     let new_code = rand_bytes::<16>()
         .await
         .map_err(|error| RegistryError::Generic { error })?;
     store::agent::challenge(
-        agent_id,
+        agent,
         challenger,
         input.request.agent,
         input.tee,
@@ -196,7 +134,7 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
     .await?;
 
     store::state::notify_subscribers(AgentEvent {
-        id: agent_id,
+        id: agent,
         kind: AgentEventKind::Challenged,
         ts: now_ms,
     });

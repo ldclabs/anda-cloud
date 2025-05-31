@@ -29,6 +29,7 @@ type ChallengeRequest = record {
   authentication : opt SignedEnvelope;
   agent : AgentInfo;
   code : blob;
+  created_at : nat64;
   registry : principal;
 };
 type DelegationCompact = record { e : nat64; p : blob; t : opt vec principal };

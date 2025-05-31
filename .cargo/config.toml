@@ -1,0 +1,2 @@
+[patch.crates-io]
+ic-cdk = { git = "https://github.com/dfinity/cdk-rs", rev = "65e9c4a966914fd028fe10ff3001fd48971596c4" }

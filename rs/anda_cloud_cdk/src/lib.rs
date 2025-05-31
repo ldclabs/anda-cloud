@@ -11,6 +11,9 @@ pub mod agent;
 /// Registry module containing structures and implementations for the Anda Registry Canister.
 pub mod registry;
 
+pub use agent::*;
+pub use registry::*;
+
 /// Serializes an object to CBOR (Concise Binary Object Representation) format.
 ///
 /// CBOR is a binary data serialization format that is designed to be compact and efficient.
