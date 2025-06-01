@@ -51,8 +51,8 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         }
     }
 
-    if let Some((canister, handle)) = &input.request.agent.handle {
-        store::state::check_handle(*canister, handle.clone(), agent).await?;
+    if let Some(canister) = &input.request.agent.handle_canister {
+        store::state::check_handle(*canister, input.request.agent.handle.clone(), agent).await?;
     }
 
     let code = rand_bytes::<16>()
@@ -115,8 +115,8 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         }
     }
 
-    if let Some((canister, handle)) = &input.request.agent.handle {
-        store::state::check_handle(*canister, handle.clone(), agent).await?;
+    if let Some(canister) = &input.request.agent.handle_canister {
+        store::state::check_handle(*canister, input.request.agent.handle.clone(), agent).await?;
     }
 
     let new_code = rand_bytes::<16>()

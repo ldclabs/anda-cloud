@@ -15,12 +15,13 @@ export interface Agent {
   'health_power' : bigint,
 }
 export interface AgentInfo {
+  'handle_canister' : [] | [Principal],
   'payments' : Array<PaymentProtocol>,
   'endpoint' : string,
   'name' : string,
   'protocols' : Array<[AgentProtocol, string]>,
   'description' : string,
-  'handle' : [] | [[Principal, string]],
+  'handle' : string,
 }
 export type AgentProtocol = { 'A2A' : null } |
   { 'MCP' : null } |

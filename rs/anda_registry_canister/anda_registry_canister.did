@@ -11,12 +11,13 @@ type Agent = record {
   health_power : nat64;
 };
 type AgentInfo = record {
+  handle_canister : opt principal;
   payments : vec PaymentProtocol;
   endpoint : text;
   name : text;
   protocols : vec record { AgentProtocol; text };
   description : text;
-  handle : opt record { principal; text };
+  handle : text;
 };
 type AgentProtocol = variant { A2A; MCP; ANDA };
 type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };

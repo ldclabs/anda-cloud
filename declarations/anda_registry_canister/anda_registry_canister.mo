@@ -15,12 +15,13 @@ module {
     health_power : Nat64;
   };
   public type AgentInfo = {
+    handle_canister : ?Principal;
     payments : [PaymentProtocol];
     endpoint : Text;
     name : Text;
     protocols : [(AgentProtocol, Text)];
     description : Text;
-    handle : ?(Principal, Text);
+    handle : Text;
   };
   public type AgentProtocol = { #A2A; #MCP; #ANDA };
   public type ChainArgs = { #Upgrade : UpgradeArgs; #Init : InitArgs };

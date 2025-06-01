@@ -62,10 +62,13 @@ pub struct Agent {
 ///
 /// This structure holds the metadata and configuration details that define
 /// an agent's capabilities, endpoints, and supported protocols.
-#[derive(Clone, Debug, Default, CandidType, Deserialize, Serialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
 pub struct AgentInfo {
-    /// Unique account identifier of the agent on dMsg.net.
-    pub handle: Option<(Principal, String)>,
+    /// Unique account identifier of the agent.
+    pub handle: String,
+
+    /// The dMsg.net canister where the agent profile is stored.
+    pub handle_canister: Option<Principal>,
 
     /// Human readable name of the agent.
     /// (e.g. "Anda ICP")
@@ -104,6 +107,8 @@ impl AgentInfo {
     /// - `Ok(())` if validation passes
     /// - `Err(String)` with a descriptive error message if validation fails
     pub fn validate(&self) -> Result<(), String> {
+        validate_handle(&self.handle)?;
+
         if self.name.is_empty() {
             return Err("name is required".to_string());
         }
@@ -143,6 +148,35 @@ impl AgentInfo {
         }
         Ok(())
     }
+}
+
+/// Validates a agent handle to ensure it doesn't contain invalid characters
+///
+/// # Rules
+/// - Must not be empty
+/// - Must not exceed 64 characters
+/// - Must start with a lowercase letter
+/// - Can only contain: lowercase letters (a-z), digits (0-9), and underscores (_)
+pub fn validate_handle(handle: &str) -> Result<(), String> {
+    if handle.is_empty() {
+        return Err("empty string".into());
+    }
+
+    if handle.len() > 64 {
+        return Err("string length exceeds the limit 64".into());
+    }
+
+    let mut iter = handle.chars();
+    if !matches!(iter.next(), Some('a'..='z')) {
+        return Err("handle must start with a lowercase letter".into());
+    }
+
+    for c in iter {
+        if !matches!(c, 'a'..='z' | '0'..='9' | '_' ) {
+            return Err(format!("invalid character: {}", c));
+        }
+    }
+    Ok(())
 }
 
 /// Represents a challenge request initiated by a challenger to an agent.

@@ -15,7 +15,12 @@ use pocket_ic::{PocketIc, PocketIcBuilder};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
-use std::{collections::BTreeMap, ops::Add, path::Path, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Add,
+    path::Path,
+    time::Duration,
+};
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Default)]
 pub struct HttpResponse {
@@ -41,7 +46,9 @@ fn anda_registry_canister_should_work() {
         registry: can.canister,
         code: [0u8; 16].into(),
         agent: AgentInfo {
-            name: "test_agent".to_string(),
+            handle: "test_agent".to_string(),
+            handle_canister: None,
+            name: "test agent".to_string(),
             description: "test agent".to_string(),
             endpoint: "https://test.agent/endpoint".to_string(),
             protocols: BTreeMap::from([(
@@ -51,7 +58,7 @@ fn anda_registry_canister_should_work() {
                     agent_id.sender().unwrap()
                 ),
             )]),
-            ..Default::default()
+            payments: BTreeSet::new(),
         },
         created_at: unix_ms(),
         authentication: None,
@@ -101,6 +108,8 @@ fn anda_registry_canister_should_work() {
             registry: can.canister,
             code: [0u8; 16].into(),
             agent: AgentInfo {
+                handle: "anda".to_string(),
+                handle_canister: None,
                 name: "Anda".to_string(),
                 description: "test agent".to_string(),
                 endpoint: "https://test.agent/endpoint".to_string(),
@@ -111,7 +120,7 @@ fn anda_registry_canister_should_work() {
                         agent_id.sender().unwrap()
                     ),
                 )]),
-                ..Default::default()
+                payments: BTreeSet::new(),
             },
             created_at: unix_ms(),
             authentication: None,
@@ -137,6 +146,8 @@ fn anda_registry_canister_should_work() {
             registry: can.canister,
             code: agent.challenge_code,
             agent: AgentInfo {
+                handle: "anda".to_string(),
+                handle_canister: None,
                 name: "Anda".to_string(),
                 description: "test agent".to_string(),
                 endpoint: "https://test.agent/endpoint".to_string(),
@@ -147,7 +158,7 @@ fn anda_registry_canister_should_work() {
                         agent_id.sender().unwrap()
                     ),
                 )]),
-                ..Default::default()
+                payments: BTreeSet::new(),
             },
             created_at: unix_ms(),
             authentication: None,
@@ -201,6 +212,8 @@ fn anda_registry_canister_should_work() {
                 registry: can.canister,
                 code: agent.challenge_code,
                 agent: AgentInfo {
+                    handle: "anda".to_string(),
+                    handle_canister: None,
                     name: "Anda 2".to_string(),
                     description: "test agent".to_string(),
                     endpoint: "https://test.agent/endpoint".to_string(),
@@ -211,7 +224,7 @@ fn anda_registry_canister_should_work() {
                             agent_id.sender().unwrap()
                         ),
                     )]),
-                    ..Default::default()
+                    payments: BTreeSet::new(),
                 },
                 created_at: unix_ms(),
                 authentication: None,

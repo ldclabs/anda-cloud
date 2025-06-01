@@ -92,7 +92,10 @@ pub struct AgentLocal {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AgentInfoLocal {
     #[serde(rename = "h")]
-    handle: Option<(Principal, String)>,
+    handle: String,
+
+    #[serde(rename = "c")]
+    handle_canister: Option<Principal>,
 
     #[serde(rename = "n")]
     name: String,
@@ -125,6 +128,7 @@ impl From<AgentInfo> for AgentInfoLocal {
     fn from(info: AgentInfo) -> Self {
         Self {
             handle: info.handle,
+            handle_canister: info.handle_canister,
             name: info.name,
             description: info.description,
             endpoint: info.endpoint,
@@ -138,6 +142,7 @@ impl From<AgentInfoLocal> for AgentInfo {
     fn from(info: AgentInfoLocal) -> Self {
         Self {
             handle: info.handle,
+            handle_canister: info.handle_canister,
             name: info.name,
             description: info.description,
             endpoint: info.endpoint,
@@ -431,8 +436,8 @@ pub mod agent {
             });
 
             ri.id_map.insert(id, (idx, now_ms));
-            if let Some((_, handle)) = &info.handle {
-                ri.by_handle.insert(handle.clone(), idx);
+            if info.handle_canister.is_some() {
+                ri.by_handle.insert(info.handle.clone(), idx);
             }
 
             AGENT_STORE.with_borrow_mut(|ra| {
@@ -492,12 +497,10 @@ pub mod agent {
                 }
 
                 if info.handle != agent.info.handle {
-                    if let Some((_, handle)) = &agent.info.handle {
-                        ri.by_handle.remove(handle);
-                    }
+                    ri.by_handle.remove(&agent.info.handle);
 
-                    if let Some((_, handle)) = &info.handle {
-                        ri.by_handle.insert(handle.clone(), *idx);
+                    if info.handle_canister.is_some() {
+                        ri.by_handle.insert(info.handle.clone(), *idx);
                     }
                 }
 
@@ -684,10 +687,10 @@ mod tests {
         ByteArrayB64::from(bytes)
     }
 
-    fn create_agent_info(handle: Option<String>) -> AgentInfo {
-        let handle_info = handle.map(|h| (random_principal(), h));
+    fn create_agent_info(handle: String, handle_canister: Option<Principal>) -> AgentInfo {
         AgentInfo {
-            handle: handle_info,
+            handle,
+            handle_canister,
             name: "Test Agent".to_string(),
             description: "Test Description".to_string(),
             endpoint: "https://example.com".to_string(),
@@ -703,7 +706,10 @@ mod tests {
         let id = random_principal();
         let challenger = random_principal();
         let code = random_code();
-        let info = create_agent_info(Some("test_handle".to_string()));
+        let info = create_agent_info(
+            "test_handle".to_string(),
+            Principal::from_text("nscli-qiaaa-aaaaj-qa4pa-cai").ok(),
+        );
         let now_ms = 1000;
 
         // 测试注册
@@ -726,12 +732,9 @@ mod tests {
         assert_eq!(agent.challenged_by, challenger);
         assert_eq!(agent.challenge_code, code);
 
-        // 测试通过句柄获取代理
-        if let Some((_, handle)) = &info.handle {
-            let agent_by_handle = agent::get_agent_by_handle(handle.clone());
-            assert!(agent_by_handle.is_ok());
-            assert_eq!(agent_by_handle.unwrap().id, id);
-        }
+        let agent_by_handle = agent::get_agent_by_handle(info.handle);
+        assert!(agent_by_handle.is_ok());
+        assert_eq!(agent_by_handle.unwrap().id, id);
     }
 
     #[tokio::test]
@@ -741,7 +744,10 @@ mod tests {
         let id = random_principal();
         let challenger = random_principal();
         let code = random_code();
-        let info = create_agent_info(Some("test_handle".to_string()));
+        let info = create_agent_info(
+            "test_handle".to_string(),
+            Principal::from_text("nscli-qiaaa-aaaaj-qa4pa-cai").ok(),
+        );
         let now_ms = 1000;
 
         // 先注册代理
@@ -751,7 +757,10 @@ mod tests {
 
         // 测试挑战
         let new_code = random_code();
-        let new_info = create_agent_info(Some("new_handle".to_string()));
+        let new_info = create_agent_info(
+            "new_handle".to_string(),
+            Principal::from_text("nscli-qiaaa-aaaaj-qa4pa-cai").ok(),
+        );
         let new_now_ms = 2000;
 
         // 测试错误的挑战码
@@ -788,11 +797,12 @@ mod tests {
         assert_eq!(agent.health_power, new_now_ms - now_ms); // 健康值应该增加
 
         // 测试通过新句柄获取代理
-        if let Some((_, handle)) = &new_info.handle {
-            let agent_by_handle = agent::get_agent_by_handle(handle.clone());
-            assert!(agent_by_handle.is_ok());
-            assert_eq!(agent_by_handle.unwrap().id, id);
-        }
+        let result = agent::get_agent_by_handle(info.handle);
+        assert!(matches!(result, Err(RegistryError::NotFound { .. })));
+
+        let result = agent::get_agent_by_handle(new_info.handle);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().id, id);
     }
 
     #[tokio::test]
@@ -802,7 +812,7 @@ mod tests {
         let id = random_principal();
         let challenger = random_principal();
         let code = random_code();
-        let info = create_agent_info(Some("test_handle".to_string()));
+        let info = create_agent_info("test_handle".to_string(), None);
         let now_ms = 1000;
 
         // 设置过期时间为1小时
@@ -817,7 +827,7 @@ mod tests {
 
         // 测试过期挑战（2小时后）
         let new_code = random_code();
-        let new_info = create_agent_info(Some("new_handle".to_string()));
+        let new_info = create_agent_info("new_handle".to_string(), None);
         let new_now_ms = now_ms + 7200 * 1000; // 2小时后
 
         // 挑战
@@ -854,7 +864,7 @@ mod tests {
             let id = random_principal();
             ids.push(id);
             let code = random_code();
-            let info = create_agent_info(Some(format!("handle_{}", i)));
+            let info = create_agent_info(format!("handle_{}", i), None);
             let _ = agent::register(id, challenger, info, None, code, now_ms + i).await;
         }
 
@@ -873,7 +883,7 @@ mod tests {
             if i % 2 == 0 {
                 let code = agent::get_agent(*id).unwrap().challenge_code;
                 let new_code = random_code();
-                let info = create_agent_info(Some(format!("handle_{}_updated", i)));
+                let info = create_agent_info(format!("handle_{}_updated", i), None);
                 let new_now_ms = now_ms + 1000 + i as u64;
                 let _ =
                     agent::challenge(*id, challenger, info, None, code, new_code, new_now_ms).await;
