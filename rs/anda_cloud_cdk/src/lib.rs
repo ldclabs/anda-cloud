@@ -1,5 +1,6 @@
 use candid::{CandidType, Principal};
 use ciborium::into_writer;
+use core::fmt::Display;
 use ic_auth_types::ByteBufB64;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
@@ -84,6 +85,25 @@ pub enum TEEKind {
     NITRO,
 }
 
+impl Display for TEEKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TEEKind::NITRO => write!(f, "NITRO"),
+        }
+    }
+}
+
+impl TryFrom<&str> for TEEKind {
+    type Error = String;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s.to_uppercase().as_str() {
+            "NITRO" => Ok(TEEKind::NITRO),
+            _ => Err(format!("Unknown TEE kind: {}", s)),
+        }
+    }
+}
+
 impl TEEInfo {
     /// Validates the TEE information to ensure it meets system requirements.
     ///
@@ -118,4 +138,50 @@ impl TEEInfo {
 pub enum PaymentProtocol {
     /// X402 payment protocol
     X402,
+}
+
+impl Display for PaymentProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PaymentProtocol::X402 => write!(f, "X402"),
+        }
+    }
+}
+
+impl TryFrom<&str> for PaymentProtocol {
+    type Error = String;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s.to_uppercase().as_str() {
+            "X402" => Ok(PaymentProtocol::X402),
+            _ => Err(format!("Unknown PaymentProtocol: {}", s)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ciborium::Value;
+
+    #[test]
+    fn test_tee_protocol() {
+        let val = TEEKind::try_from("NITRO").unwrap();
+        assert_eq!(val, TEEKind::NITRO);
+        let val = TEEKind::try_from("nitro").unwrap();
+        assert_eq!(val, TEEKind::NITRO);
+        assert_eq!(val.to_string(), "NITRO");
+
+        let got = serde_json::to_string(&val).unwrap();
+        assert_eq!(got, "\"NITRO\"");
+
+        let got: TEEKind = serde_json::from_str(&got).unwrap();
+        assert_eq!(got, val);
+
+        let got = Value::serialized(&val).unwrap();
+        let expected = Value::Text("NITRO".to_string());
+        assert_eq!(got, expected);
+        let got: TEEKind = Value::deserialized(&expected).unwrap();
+        assert_eq!(got, val);
+    }
 }

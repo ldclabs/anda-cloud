@@ -1,4 +1,5 @@
 use candid::{CandidType, Principal};
+use core::fmt::Display;
 use ic_auth_types::ByteArrayB64;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -317,6 +318,29 @@ pub enum AgentProtocol {
     A2A,
     /// Model Context Protocol, https://github.com/modelcontextprotocol
     MCP,
+}
+
+impl Display for AgentProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AgentProtocol::ANDA => write!(f, "ANDA"),
+            AgentProtocol::A2A => write!(f, "A2A"),
+            AgentProtocol::MCP => write!(f, "MCP"),
+        }
+    }
+}
+
+impl TryFrom<&str> for AgentProtocol {
+    type Error = String;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s.to_uppercase().as_str() {
+            "ANDA" => Ok(AgentProtocol::ANDA),
+            "A2A" => Ok(AgentProtocol::A2A),
+            "MCP" => Ok(AgentProtocol::MCP),
+            _ => Err(format!("Unknown AgentProtocol: {}", s)),
+        }
+    }
 }
 
 pub static AGENT_EVENT_API: &str = "on_agent_event";
