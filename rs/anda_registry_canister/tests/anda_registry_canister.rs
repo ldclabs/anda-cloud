@@ -8,7 +8,7 @@ use candid::{
 };
 use ed25519_consensus::SigningKey;
 use ic_agent::{Identity, identity::BasicIdentity};
-use ic_auth_verifier::envelope::{SignedEnvelope, unix_ms};
+use ic_auth_verifier::{SignedEnvelope, unix_timestamp};
 use ic_http_certification::{HeaderField, HttpRequest, Method};
 use ic_stable_structures::Storable;
 use pocket_ic::{PocketIc, PocketIcBuilder};
@@ -19,7 +19,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Add,
     path::Path,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Default)]
@@ -39,6 +39,8 @@ fn anda_registry_canister_should_work() {
     let agent_id = new_identity();
     let caller = challenger_id.sender().unwrap();
     let can = TestCanister::new::<()>("anda_registry_canister", None, Some(caller));
+    can.pic.set_time(SystemTime::now().into());
+
     let rt: Result<RegistryState, RegistryError> = can.query(caller, "get_state", &());
     println!("RegistryState: {:?}", rt.unwrap());
 
@@ -48,7 +50,7 @@ fn anda_registry_canister_should_work() {
         agent: AgentInfo {
             handle: "test_agent".to_string(),
             handle_canister: None,
-            name: "test agent".to_string(),
+            name: "Test Agent".to_string(),
             description: "test agent".to_string(),
             endpoint: "https://test.agent/endpoint".to_string(),
             protocols: BTreeMap::from([(
@@ -60,7 +62,7 @@ fn anda_registry_canister_should_work() {
             )]),
             payments: BTreeSet::new(),
         },
-        created_at: unix_ms(),
+        created_at: unix_timestamp().as_millis() as u64,
         authentication: None,
     };
     let digest = request.core_digest();
@@ -95,7 +97,8 @@ fn anda_registry_canister_should_work() {
     let agent = rt.unwrap();
     println!("Agent: {:?}", agent);
     assert_eq!(agent.id, agent_id.sender().unwrap());
-    assert_eq!(agent.info.name, "test_agent");
+    assert_eq!(agent.info.handle, "test_agent");
+    assert_eq!(agent.info.name, "Test Agent");
     assert!(agent.health_power == 0);
 
     let time = can.pic.get_time();
@@ -122,7 +125,7 @@ fn anda_registry_canister_should_work() {
                 )]),
                 payments: BTreeSet::new(),
             },
-            created_at: unix_ms(),
+            created_at: unix_timestamp().as_millis() as u64,
             authentication: None,
         };
         let digest = request.core_digest();
@@ -160,7 +163,7 @@ fn anda_registry_canister_should_work() {
                 )]),
                 payments: BTreeSet::new(),
             },
-            created_at: unix_ms(),
+            created_at: unix_timestamp().as_millis() as u64,
             authentication: None,
         };
         let digest = request.core_digest();
@@ -179,6 +182,7 @@ fn anda_registry_canister_should_work() {
         let rt: Result<Agent, RegistryError> =
             can.query(caller, "get_agent", &(agent_id.sender().unwrap(),));
         let agent = rt.unwrap();
+        assert_eq!(agent.info.handle, "anda");
         assert_eq!(agent.info.name, "Anda");
         assert!(agent.health_power >= 1000);
     }
@@ -199,6 +203,7 @@ fn anda_registry_canister_should_work() {
                 .any(|h| { h.0 == "content-type" && h.1 == "application/json" })
         );
         let agent: Agent = serde_json::from_slice(&rt.body).unwrap();
+        assert_eq!(agent.info.handle, "anda");
         assert_eq!(agent.info.name, "Anda");
         assert!(agent.health_power >= 1000);
 
@@ -226,7 +231,7 @@ fn anda_registry_canister_should_work() {
                     )]),
                     payments: BTreeSet::new(),
                 },
-                created_at: unix_ms(),
+                created_at: unix_timestamp().as_millis() as u64,
                 authentication: None,
             };
             let digest = request.core_digest();

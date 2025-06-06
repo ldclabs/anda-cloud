@@ -133,10 +133,6 @@ impl AgentInfo {
             return Err("endpoint is not a valid URL".to_string());
         }
 
-        if self.protocols.is_empty() {
-            return Err("protocols is required".to_string());
-        }
-
         for (protocol, url) in &self.protocols {
             if !url.starts_with("https://") {
                 return Err(format!("protocol {protocol:?} should start with https://",));
