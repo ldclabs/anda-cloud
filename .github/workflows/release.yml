@@ -19,6 +19,7 @@ jobs:
       run: |
         rustup toolchain install nightly
         rustup default nightly
+        rustup component add rust-src --toolchain nightly
         rustup target add wasm64-unknown-unknown
         cargo install ic-wasm
         mkdir -p out
