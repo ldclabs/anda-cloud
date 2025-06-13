@@ -18,9 +18,7 @@ jobs:
     - name: Build canisters
       run: |
         rustup toolchain install nightly
-        rustup default nightly
         rustup component add rust-src --toolchain nightly
-        rustup target add wasm64-unknown-unknown
         cargo install ic-wasm
         mkdir -p out
         cargo +nightly build -Z build-std=std,panic_abort --target wasm64-unknown-unknown --release --locked -p anda_registry_canister
