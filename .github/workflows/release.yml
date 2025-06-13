@@ -3,6 +3,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
 jobs:
   build-wasm:
     runs-on: ubuntu-latest
@@ -63,9 +69,20 @@ jobs:
       with:
         name: binary-artifacts
         path: out-binary
+    - name: Get release tag
+      id: get_tag
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+        else
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ steps.get_tag.outputs.tag }}
+        name: Release ${{ steps.get_tag.outputs.tag }}
+        draft: ${{ github.event_name == 'workflow_dispatch' }}
         files: |
           out-wasm/*
           out-binary/*
