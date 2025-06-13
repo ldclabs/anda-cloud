@@ -18,6 +18,7 @@ jobs:
     - name: Build canisters
       run: |
         rustup toolchain install nightly
+        rustup default nightly
         rustup target add wasm64-unknown-unknown
         cargo install ic-wasm
         mkdir -p out
