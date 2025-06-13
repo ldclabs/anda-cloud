@@ -1,5 +1,4 @@
 use candid::{CandidType, Principal};
-use ciborium::into_writer;
 use core::fmt::Display;
 use ic_auth_types::ByteBufB64;
 use serde::{Deserialize, Serialize};
@@ -14,25 +13,6 @@ pub mod registry;
 
 pub use agent::*;
 pub use registry::*;
-
-/// Serializes an object to CBOR (Concise Binary Object Representation) format.
-///
-/// CBOR is a binary data serialization format that is designed to be compact and efficient.
-/// This function converts a Rust object to its CBOR representation as a byte vector.
-///
-/// # Arguments
-/// * `obj` - A reference to an object that implements the Serialize trait
-///
-/// # Returns
-/// A Vec<u8> containing the CBOR-encoded representation of the object
-///
-/// # Panics
-/// Panics if the object cannot be encoded in CBOR format
-pub fn to_cbor_bytes(obj: &impl Serialize) -> Vec<u8> {
-    let mut buf: Vec<u8> = Vec::new();
-    into_writer(obj, &mut buf).expect("failed to encode in CBOR format");
-    buf
-}
 
 /// Computes the SHA3-256 hash of the provided data.
 ///

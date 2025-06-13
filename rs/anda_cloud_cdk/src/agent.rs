@@ -1,10 +1,10 @@
 use candid::{CandidType, Principal};
 use core::fmt::Display;
-use ic_auth_types::ByteArrayB64;
+use ic_auth_types::{ByteArrayB64, canonical_cbor_into_vec};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{PaymentProtocol, RegistryError, SignedEnvelope, TEEInfo, sha3_256, to_cbor_bytes};
+use crate::{PaymentProtocol, RegistryError, SignedEnvelope, TEEInfo, sha3_256};
 
 pub const ZERO_CHALLENGE_CODE: ByteArrayB64<16> = ByteArrayB64([0u8; 16]);
 
@@ -216,12 +216,13 @@ impl ChallengeRequest {
     /// # Returns
     /// - A 32-byte array containing the SHA3-256 hash of the serialized data
     pub fn core_digest(&self) -> [u8; 32] {
-        let data = to_cbor_bytes(&ChallengeRequestCoreRef {
+        let data = canonical_cbor_into_vec(&ChallengeRequestCoreRef {
             registry: &self.registry,
             code: &self.code,
             agent: &self.agent,
             created_at: self.created_at,
-        });
+        })
+        .expect("failed to serialize ChallengeRequestCoreRef");
         sha3_256(&data)
     }
 
@@ -232,7 +233,7 @@ impl ChallengeRequest {
     /// # Returns
     /// - A 32-byte array containing the SHA3-256 hash of the serialized data
     pub fn digest(&self) -> [u8; 32] {
-        let data = to_cbor_bytes(&self);
+        let data = canonical_cbor_into_vec(&self).expect("failed to serialize ChallengeRequest");
         sha3_256(&data)
     }
 

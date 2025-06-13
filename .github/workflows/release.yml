@@ -11,13 +11,14 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Build canisters
       run: |
-        rustup target add wasm32-unknown-unknown
+        rustup toolchain install nightly
+        rustup target add wasm64-unknown-unknown
         cargo install ic-wasm
         mkdir -p out
-        cargo build --target wasm32-unknown-unknown --release --locked -p anda_registry_canister
+        cargo +nightly build -Z build-std=std,panic_abort --target wasm64-unknown-unknown --release --locked -p anda_registry_canister
         for CAN in anda_registry_canister
         do
-          cp "target/wasm32-unknown-unknown/release/$CAN.wasm" out/
+          cp "target/wasm64-unknown-unknown/release/$CAN.wasm" out/
           cp "src/$CAN/$CAN.did" "out/$CAN.did"
           WASM="out/$CAN.wasm"
           ic-wasm $WASM -o $WASM metadata candid:service -f "out/$CAN.did" -v public

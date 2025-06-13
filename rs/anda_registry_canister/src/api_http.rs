@@ -1,7 +1,8 @@
-use anda_cloud_cdk::{agent::ChallengeEnvelope, registry::RegistryError, to_cbor_bytes};
+use anda_cloud_cdk::{agent::ChallengeEnvelope, registry::RegistryError};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use candid::{CandidType, Principal};
 use ciborium::from_reader;
+use ic_auth_types::cbor_into_vec;
 use ic_http_certification::{HeaderField, HttpRequest, HttpUpdateRequest};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -53,10 +54,11 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
             format!(
                 "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
                 BASE64.encode(certified_data),
-                BASE64.encode(to_cbor_bytes(&witness)),
-                BASE64.encode(to_cbor_bytes(
-                    &store::state::DEFAULT_EXPR_PATH.to_expr_path()
-                ))
+                BASE64.encode(cbor_into_vec(&witness).expect("failed to serialize witness")),
+                BASE64.encode(
+                    cbor_into_vec(&store::state::DEFAULT_EXPR_PATH.to_expr_path())
+                        .expect("failed to serialize expr path")
+                )
             ),
         ),
     ];
@@ -168,7 +170,9 @@ async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpRespons
 fn get_state(in_cbor: bool) -> Result<Vec<u8>, RegistryError> {
     let body = store::state::get_state();
     if in_cbor {
-        Ok(to_cbor_bytes(&body))
+        Ok(cbor_into_vec(&body).map_err(|err| RegistryError::Generic {
+            error: format!("failed to serialize state, error: {err}"),
+        })?)
     } else {
         serde_json::to_vec(&body).map_err(|err| RegistryError::Generic {
             error: format!("failed to serialize state, error: {err}"),
@@ -187,20 +191,24 @@ fn lookup(url: Url, in_cbor: bool) -> Result<Vec<u8>, RegistryError> {
                 })?;
                 let agent = store::agent::get_agent(id)?;
                 if in_cbor {
-                    return Ok(to_cbor_bytes(&agent));
+                    return cbor_into_vec(&agent).map_err(|err| RegistryError::Generic {
+                        error: format!("failed to serialize agent in CBOR, error: {err}"),
+                    });
                 } else {
                     return serde_json::to_vec(&agent).map_err(|err| RegistryError::Generic {
-                        error: format!("failed to serialize agent, error: {err}"),
+                        error: format!("failed to serialize agent in JSON, error: {err}"),
                     });
                 }
             }
             "handle" => {
                 let agent = store::agent::get_agent_by_handle(value.to_string())?;
                 if in_cbor {
-                    return Ok(to_cbor_bytes(&agent));
+                    return cbor_into_vec(&agent).map_err(|err| RegistryError::Generic {
+                        error: format!("failed to serialize agent in CBOR, error: {err}"),
+                    });
                 } else {
                     return serde_json::to_vec(&agent).map_err(|err| RegistryError::Generic {
-                        error: format!("failed to serialize agent, error: {err}"),
+                        error: format!("failed to serialize agent in JSON, error: {err}"),
                     });
                 }
             }
