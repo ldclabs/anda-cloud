@@ -36,6 +36,5 @@ ic-dummy-getrandom-for-wasm = "0.1"
 rand = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 pocket-ic = { workspace = true }
-ed25519-consensus = { workspace = true }
 ic-agent = { workspace = true }
 ic_auth_verifier = { workspace = true, features = ["full"] }

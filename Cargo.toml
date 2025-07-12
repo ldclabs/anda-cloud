@@ -9,7 +9,7 @@ strip = true
 opt-level = 's'
 
 [workspace.package]
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 repository = "https://github.com/ldclabs/anda-cloud"
 keywords = ["anda", "agent", "icp", "cloud"]
@@ -25,7 +25,7 @@ serde_bytes = "0.11"
 serde_json = "1.0"
 sha3 = "0.10"
 ic-cdk = "0.18"
-ic-agent = "0.40"
+ic-agent = "0.41"
 ic-http-certification = "3"
 ic-stable-structures = "0.6"
 ic_auth_types = { version = "0.5" }
@@ -38,7 +38,6 @@ thiserror = "2"
 rand = "0.9"
 tokio = { version = "1" }
 pocket-ic = "9"
-ed25519-consensus = "2.1"
 
 [workspace.metadata.cargo-shear]
 ignored = ["ic-dummy-getrandom-for-wasm"]

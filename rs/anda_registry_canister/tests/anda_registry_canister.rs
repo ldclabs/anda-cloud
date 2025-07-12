@@ -6,13 +6,11 @@ use candid::{
     CandidType, Principal, decode_one, encode_one,
     utils::{ArgumentEncoder, encode_args_ref},
 };
-use ed25519_consensus::SigningKey;
-use ic_agent::{Identity, identity::BasicIdentity};
-use ic_auth_verifier::{SignedEnvelope, unix_timestamp};
+use ic_agent::Identity;
+use ic_auth_verifier::{SignedEnvelope, new_basic_identity, unix_timestamp};
 use ic_http_certification::{HeaderField, HttpRequest, Method};
 use ic_stable_structures::Storable;
 use pocket_ic::{PocketIc, PocketIcBuilder};
-use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use std::{
@@ -35,8 +33,8 @@ pub struct HttpResponse {
 #[test]
 #[ignore]
 fn anda_registry_canister_should_work() {
-    let challenger_id = new_identity();
-    let agent_id = new_identity();
+    let challenger_id = new_basic_identity();
+    let agent_id = new_basic_identity();
     let caller = challenger_id.sender().unwrap();
     let can = TestCanister::new::<()>("anda_registry_canister", None, Some(caller));
     can.pic.set_time(SystemTime::now().into());
@@ -370,17 +368,4 @@ fn git_root_dir() -> String {
         .expect("Invalid UTF-8 output")
         .trim()
         .to_string()
-}
-
-fn rand_bytes<const N: usize>() -> [u8; N] {
-    let mut rng = rand::rng();
-    let mut bytes = [0u8; N];
-    rng.fill_bytes(&mut bytes);
-    bytes
-}
-
-fn new_identity() -> impl Identity {
-    let secret: [u8; 32] = rand_bytes();
-    let signing_key = SigningKey::from(secret);
-    BasicIdentity::from_signing_key(signing_key)
 }
