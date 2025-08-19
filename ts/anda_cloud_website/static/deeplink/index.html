@@ -8,9 +8,11 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap"
-    rel="stylesheet">
+  <!-- Load Google Fonts in a non-blocking way -->
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap">
+  <link rel="stylesheet" media="print" onload="this.media='all'"
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap">
   <link rel="stylesheet" href="/_assets/css/landing.css">
   <style>
     .logo {
@@ -66,27 +68,97 @@
     </div>
 
     <div class="buttons">
+      <a id="open-app" class="btn btn-primary" target="_self">Open in Anda AI App</a>
       <a href="https://anda.ai" class="btn btn-primary">Visit Website</a>
-      <button onclick="window.close()" class="btn btn-secondary">Close Window</button>
     </div>
   </div>
 
   <script>
     const statusElement = document.querySelector('.status-text')
+    const search = new URLSearchParams(window.location.search)
     const nextUrl = window.location.href.replace(/^.*deeplink/i, "anda://deeplink")
-    setTimeout(() => {
-      try {
-        window.location.assign(nextUrl)
+    const openBtn = document.getElementById('open-app')
 
-        setTimeout(() => {
-          statusElement.textContent = 'If the app did not launch automatically, please open the Anda.AI app manually'
-        }, 5000)
-
-      } catch (err) {
-        console.error("Error redirecting to desktop app:", err)
-        statusElement.textContent = 'Unable to launch the app automatically. Please open Anda.AI manually or visit our website for help'
+    // Copy text to clipboard with secure-context API and a fallback for older browsers.
+    function copyTextToClipboard(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text).then(() => true).catch(() => false)
       }
-    }, 100)
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'fixed'
+        ta.style.top = '-9999px'
+        document.body.appendChild(ta)
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        return Promise.resolve(ok)
+      } catch (e) {
+        return Promise.resolve(false)
+      }
+    }
+
+    // Prepare anchor with deeplink href and handle UX hints without blocking default navigation.
+    if (openBtn && openBtn.tagName === 'A') {
+      openBtn.setAttribute('href', nextUrl)
+
+      openBtn.addEventListener('click', () => {
+        // Observe if the page gets hidden (likely app switch), to infer success.
+        let switched = false
+        const onVisibility = () => {
+          if (document.visibilityState === 'hidden') {
+            switched = true
+            statusElement.textContent = 'Opening Anda AI app...'
+          }
+        }
+        document.addEventListener('visibilitychange', onVisibility, { once: true })
+
+        // Copy deeplink for manual paste if needed; do not prevent default navigation.
+        copyTextToClipboard(nextUrl).then((ok) => {
+          if (ok && !switched) {
+            statusElement.textContent = 'Opening Anda AI app... The link has been copied to your clipboard. If it does not open, paste it in the Anda.AI app.'
+          }
+        })
+
+        // // Fallback message if nothing happened after a few seconds.
+        // setTimeout(() => {
+        //   if (!switched) {
+        //     statusElement.textContent = 'If the app did not launch, please open the Anda AI app manually or visit our website for help'
+        //   }
+        // }, 5000)
+      })
+    }
+
+    // Platform detection
+    // const isEdge = () => /Edg\//.test(navigator.userAgent)
+    // const isMacOS = () => (navigator.platform && navigator.platform.toLowerCase().includes('mac')) || /Macintosh|Mac OS X/.test(navigator.userAgent)
+
+    // Auto-attempt on macOS (excluding Edge which often blocks non-gesture external protocol navigations)
+    if (search.get('os') != 'windows') {
+      let switchedAuto = false
+      const onVisibilityAuto = () => {
+        if (document.visibilityState === 'hidden') {
+          switchedAuto = true
+          statusElement.textContent = 'Opening Anda.AI app...'
+        }
+      }
+      document.addEventListener('visibilitychange', onVisibilityAuto, { once: true })
+
+      setTimeout(() => {
+        try {
+          window.location.assign(nextUrl)
+        } catch (err) {
+          console.error('Error redirecting to desktop app (auto):', err)
+        }
+        setTimeout(() => {
+          if (!switchedAuto) {
+            statusElement.textContent = 'If the app did not launch, please click the button'
+          }
+        }, 3000)
+      }, 200)
+    }
   </script>
   <script src="/_assets/js/landing.js"></script>
 

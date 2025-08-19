@@ -8,9 +8,11 @@
   <link rel="stylesheet" href="/_assets/css/landing.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap"
-    rel="stylesheet">
+  <!-- Load Google Fonts in a non-blocking way -->
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap">
+  <link rel="stylesheet" media="print" onload="this.media='all'"
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Roboto:wght@300;400;500;700&display=swap">
   <link href="https://anda.ai" rel="canonical" />
   <meta
     content="Anda.AI - Create next-generation AI agents with persistent memory, decentralized trust, and swarm intelligence."
@@ -59,7 +61,8 @@
         <p class="subhead">Create next-generation AI agents with persistent memory, decentralized trust, and swarm
           intelligence</p>
         <div class="hero-cta">
-          <a href="#" class="btn btn-secondary">Agents app will be coming soon</a>
+          <a href="https://github.com/ldclabs/anda-app/releases/" class="btn btn-secondary" target="_blank">Download
+            Anda AI App</a>
         </div>
       </div>
       <div class="hero-visual">
