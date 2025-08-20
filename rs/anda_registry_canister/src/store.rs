@@ -210,10 +210,16 @@ impl From<Agent> for AgentLocal {
 impl Storable for AgentLocal {
     const BOUND: Bound = Bound::Unbounded;
 
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buf = vec![];
         into_writer(self, &mut buf).expect("failed to encode AgentLocal data");
         Cow::Owned(buf)
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        let mut buf = vec![];
+        into_writer(&self, &mut buf).expect("failed to encode AgentLocal data");
+        buf
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
@@ -238,14 +244,14 @@ thread_local! {
         StableCell::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(STATE_MEMORY_ID)),
             Vec::new()
-        ).expect("failed to init STATE store")
+        )
     );
 
     static INDEX_STORE: RefCell<StableCell<Vec<u8>, Memory>> = RefCell::new(
         StableCell::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(INDEX_MEMORY_ID)),
             Vec::new()
-        ).expect("failed to init Indexes store")
+        )
     );
 
     static AGENT_STORE: RefCell<StableBTreeMap<u64, AgentLocal, Memory>> = RefCell::new(
@@ -346,14 +352,14 @@ pub mod state {
             STATE_STORE.with_borrow_mut(|rs| {
                 let mut buf = vec![];
                 into_writer(r, &mut buf).expect("failed to encode STATE data");
-                rs.set(buf).expect("failed to set STATE_STORE data");
+                rs.set(buf);
             });
         });
         INDEX.with_borrow(|r| {
             INDEX_STORE.with_borrow_mut(|rs| {
                 let mut buf = vec![];
                 into_writer(r, &mut buf).expect("failed to encode INDEX data");
-                rs.set(buf).expect("failed to set INDEX_STORE data");
+                rs.set(buf);
             });
         });
     }
@@ -400,11 +406,10 @@ pub mod state {
                 error: format!("{err:?}"),
             })?;
 
-        if let Ok(user) = rt {
-            if user.id == owner {
+        if let Ok(user) = rt
+            && user.id == owner {
                 return Ok(());
             }
-        }
 
         Err(RegistryError::BadRequest {
             error: format!("handle {handle:?} is not belong to {owner}"),
@@ -667,9 +672,7 @@ mod tests {
 
         AGENT_STORE.with_borrow_mut(|a| {
             // 清空存储
-            for key in a.iter().map(|(k, _)| k).collect::<Vec<_>>() {
-                a.remove(&key);
-            }
+            a.clear_new();
         });
     }
 

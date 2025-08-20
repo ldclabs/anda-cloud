@@ -17,6 +17,14 @@
     },
     "anda_cloud_website": {
       "dependencies": [],
+      "declarations": {
+        "bindings": [
+          "ts",
+          "did"
+        ],
+        "node_compatibility": true,
+        "output": "declarations/anda_cloud_website"
+      },
       "build": [
         "echo 'Disable dfx build for anda_cloud_website'"
       ],

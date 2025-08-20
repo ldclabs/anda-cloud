@@ -2,8 +2,8 @@
 name = "anda_cloud_cdk"
 description = "A Canister Development Kit for the Anda Cloud"
 repository = "https://github.com/ldclabs/anda-cloud/tree/main/src/anda_cloud_cdk"
-version = "0.1.6"
 publish = true
+version.workspace = true
 edition.workspace = true
 keywords.workspace = true
 categories.workspace = true
