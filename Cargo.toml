@@ -9,7 +9,7 @@ strip = true
 opt-level = 's'
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 repository = "https://github.com/ldclabs/anda-cloud"
 keywords = ["anda", "agent", "icp", "cloud"]
@@ -25,7 +25,7 @@ serde_bytes = "0.11"
 serde_json = "1.0"
 sha3 = "0.10"
 ic-cdk = "0.18"
-ic-agent = "0.42"
+ic-agent = "0.44"
 ic-http-certification = "3"
 ic-stable-structures = "0.7"
 ic_auth_types = { version = "0.6" }
