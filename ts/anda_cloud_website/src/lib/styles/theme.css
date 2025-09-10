@@ -1,0 +1,331 @@
+/* Design tokens (Panda black/white, Bamboo green, Wisdom purple) */
+:root {
+  --color-bg: #0b0d0f;
+  --color-bg-alt: #121417;
+  --color-border: #1f2328;
+  --color-text: #f5f7fa;
+  --color-text-dim: #b0b7c3;
+  --color-accent: #3ddc84; /* bamboo green */
+  --color-accent-alt: #6ee7b7;
+  --color-purple: #8b5cf6; /* wisdom purple */
+  --color-purple-alt: #a78bfa;
+  --color-danger: #ef4444;
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow:
+    0 4px 16px -4px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  --gradient-accent: linear-gradient(
+    135deg,
+    var(--color-accent) 0%,
+    var(--color-purple) 70%
+  );
+  --font-sans:
+    'Inter', 'Roboto', 'HarmonyOS Sans', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+.backdrop-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 25% 15%,
+      rgba(141, 255, 200, 0.08),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 80% 70%,
+      rgba(168, 130, 255, 0.07),
+      transparent 60%
+    );
+  mask: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.9),
+    rgba(255, 255, 255, 0)
+  );
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.glass {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
+  backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.accent-ring {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 0 3px rgba(61, 220, 132, 0.15);
+}
+
+/* Scroll snapping for immersive sections */
+.snap-y {
+  scroll-snap-type: y proximity;
+}
+.snap-section {
+  scroll-snap-align: start;
+}
+
+/* Alternating section backgrounds */
+.section-dark {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.section-light {
+  background: #f8f8f9;
+  color: #0c0d10;
+}
+.section-light h1,
+.section-light h2,
+.section-light h3,
+.section-light h4 {
+  color: #0c0d10;
+}
+.section-light p,
+.section-light li,
+.section-light a {
+  color: #2f3237;
+}
+.section-light a:hover {
+  color: #000;
+}
+.section-light .card-surface {
+  background: linear-gradient(145deg, #ffffff, #f1f2f4);
+  border: 1px solid #e2e5e9;
+}
+.section-light .card-surface pre {
+  background: #111418;
+  color: #e5e9ef;
+}
+/* Subtle light-section grid (low-contrast for texture) */
+.section-light::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.055) 1px, transparent 1px),
+    radial-gradient(
+      circle at 35% 25%,
+      rgba(61, 220, 132, 0.09),
+      transparent 62%
+    ),
+    radial-gradient(
+      circle at 80% 70%,
+      rgba(139, 92, 246, 0.09),
+      transparent 67%
+    );
+  background-size:
+    40px 40px,
+    40px 40px,
+    100% 100%,
+    100% 100%;
+  background-attachment:
+    fixed, fixed, scroll, scroll; /* subtle stability of grid lines */
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0)
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0)
+  );
+}
+/* Dense variant */
+.section-light.grid-dense::before {
+  background-size:
+    24px 24px,
+    24px 24px,
+    100% 100%,
+    100% 100%;
+}
+
+/* Dark section subtle inverse grid */
+.section-dark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.33;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    radial-gradient(
+      circle at 25% 30%,
+      rgba(61, 220, 132, 0.09),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 75% 70%,
+      rgba(139, 92, 246, 0.08),
+      transparent 65%
+    );
+  background-size:
+    40px 40px,
+    40px 40px,
+    100% 100%,
+    100% 100%;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0));
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.85),
+    rgba(0, 0, 0, 0)
+  );
+  mix-blend-mode: normal;
+  opacity: 0; /* start hidden for fade-in */
+  transition: opacity 900ms ease;
+}
+.section-dark.grid-dense::before {
+  background-size:
+    24px 24px,
+    24px 24px,
+    100% 100%,
+    100% 100%;
+}
+
+/* Reveal state (applies to both light & dark) */
+.grid-reveal.section-light::before {
+  opacity: 0.55;
+}
+.grid-reveal.section-dark::before {
+  opacity: 0.33;
+}
+
+/* Subtle drifting animation for grid (only after reveal) */
+@keyframes grid-pan {
+  0% {
+    background-position:
+      0px 0px,
+      0px 0px,
+      0 0,
+      0 0;
+  }
+  50% {
+    background-position:
+      22px 14px,
+      -12px 18px,
+      0 0,
+      0 0;
+  }
+  100% {
+    background-position:
+      0px 0px,
+      0px 0px,
+      0 0,
+      0 0;
+  }
+}
+
+/* Stagger reveal keyframes */
+@keyframes fadeRise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 40px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.grid-reveal.section-light::before,
+.grid-reveal.section-dark::before {
+  animation: grid-pan 46s linear infinite;
+}
+
+/* Start hidden light variant for consistency with fade-in */
+.section-light::before {
+  transition: opacity 900ms ease;
+  opacity: 0;
+}
+
+/* Noise overlay (independent subtle texture) */
+.noise-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.18;
+  mix-blend-mode: overlay;
+  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyAgMAAABEHNznAAAACVBMVEUA////AAD///9PcznPAAAAAnRSTlMAAHaTzTgAAAAXSURBVCiRY2AYBaNgFIwMjAwMjEwqGgAAYg4AAS9sBPb7J9MAAAAASUVORK5CYII=');
+  image-rendering: pixelated;
+}
+.section-light,
+.section-dark {
+  position: relative;
+}
+.section-light > *,
+.section-dark > * {
+  position: relative;
+  z-index: 1;
+}
+/* Insert noise overlay via pseudo for maintainability */
+.section-light::after,
+.section-dark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.15;
+  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyAgMAAABEHNznAAAACVBMVEUA////AAD///9PcznPAAAAAnRSTlMAAHaTzTgAAAAXSURBVCiRY2AYBaNgFIwMjAwMjEwqGgAAYg4AAS9sBPb7J9MAAAAASUVORK5YII=');
+  image-rendering: pixelated;
+}
+.grid-reveal.section-light::after {
+  opacity: 0.18;
+}
+.grid-reveal.section-dark::after {
+  opacity: 0.13;
+}
+@media (prefers-reduced-motion: reduce) {
+  .grid-reveal.section-light::before {
+    opacity: 0.4;
+  }
+  .grid-reveal.section-dark::before {
+    opacity: 0.25;
+  }
+  .section-light::before,
+  .section-dark::before {
+    transition: none;
+  }
+  .grid-reveal.section-light::before,
+  .grid-reveal.section-dark::before {
+    animation: none;
+  }
+}

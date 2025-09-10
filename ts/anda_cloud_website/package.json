@@ -1,17 +1,40 @@
 {
-  "dependencies": {},
-  "devDependencies": {},
   "name": "anda_cloud_website",
   "private": true,
   "scripts": {
-    "build": "tsc && vite build",
-    "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss,svelte}\"",
-    "setup": "npm i && dfx deploy",
-    "start": "vite dev --port 3000",
-    "ncu": "npx npm-check-updates -u",
+    "dev": "vite dev",
+    "build": "vite build",
     "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss,svelte}\"",
+    "ncu": "npx npm-check-updates -u",
     "test": "vitest run"
   },
   "type": "module",
-  "version": "0.1.1"
+  "version": "0.1.1",
+  "dependencies": {},
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.9",
+    "@sveltejs/enhanced-img": "^0.8.1",
+    "@sveltejs/kit": "^2.37.1",
+    "@sveltejs/vite-plugin-svelte": "^6.1.4",
+    "@tailwindcss/vite": "^4.1.13",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-svelte": "^3.12.2",
+    "prettier": "^3.6.2",
+    "prettier-plugin-svelte": "^3.4.0",
+    "prettier-plugin-tailwindcss": "^0.6.14",
+    "svelte": "^5.38.7",
+    "svelte-check": "^4.3.1",
+    "tailwind-variants": "^3.1.1",
+    "tailwindcss": "^4.1.13",
+    "typescript": "~5.9.2",
+    "vite": "^7.1.5"
+  }
 }

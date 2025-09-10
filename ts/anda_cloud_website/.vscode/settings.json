@@ -1,0 +1,13 @@
+{
+  "svelte.enable-ts-plugin": true,
+  "i18n-ally.localesPaths": [
+    "src-tauri/locales"
+  ],
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.formatOnSave": true,
+  "json.schemaDownload.enable": true,
+  "typescript.tsdk": "node_modules/typescript/lib"
+}
