@@ -2,6 +2,8 @@
   import { fadeIn, parallax } from '$lib/animations/motion'
   import { neuralGrid } from '$lib/animations/neuralGrid'
   import SectionHeading from '$lib/components/SectionHeading.svelte'
+  import ArrowDownLongFill from '$lib/icons/arrow-down-long-fill.svelte'
+  import ArrowRightLine from '$lib/icons/arrow-right-line.svelte'
 </script>
 
 <section
@@ -49,16 +51,17 @@
             href="https://github.com/ldclabs/anda-app/releases/latest"
             target="_blank"
             rel="noopener"
-            class="group relative inline-flex h-12 items-center justify-center rounded-full bg-emerald-500 px-8 text-lg font-medium text-black shadow-[0_4px_24px_-4px_rgba(61,220,132,0.55)] transition hover:brightness-95 focus:ring-2 focus:ring-emerald-500/60 focus:outline-none"
+            class="group relative flex h-12 items-center justify-center gap-1 rounded-full bg-emerald-500 px-8 text-lg font-medium text-black shadow-[0_4px_24px_-4px_rgba(61,220,132,0.55)] transition hover:brightness-95 focus:ring-2 focus:ring-emerald-500/60 focus:outline-none"
           >
-            <span class="mr-2">⬇</span> Download Anda AI
+            <span><ArrowDownLongFill /></span>
+            <span>Download Anda AI</span>
           </a>
           <a
             href="https://x.com/ICPandaDAO"
             target="_blank"
             rel="noopener"
-            class="inline-flex h-12 items-center rounded-full border border-black/10 px-8 font-medium hover:bg-black/5"
-            >Follow Us on X →</a
+            class="flex h-12 items-center gap-1 rounded-full border border-black/10 px-8 font-medium hover:bg-black/5"
+            ><span>Follow Us on X</span><span><ArrowRightLine /></span></a
           >
         </div>
       </div>

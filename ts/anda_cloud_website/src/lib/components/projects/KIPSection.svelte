@@ -1,6 +1,9 @@
 <script lang="ts">
   import { fadeIn, parallax } from '$lib/animations/motion'
   import { neuralGrid } from '$lib/animations/neuralGrid'
+  import ArrowDownLine from '$lib/icons/arrow-down-line.svelte'
+  import ArrowRightLine from '$lib/icons/arrow-right-line.svelte'
+
   const kqlExample = `// Find all non-NSAID drugs that treat 'Headache', have a risk level below 4
 FIND(
   ?drug.name,
@@ -102,13 +105,13 @@ WITH METADATA {
         <a
           href="https://github.com/ldclabs/KIP"
           target="_blank"
-          class="inline-flex h-12 items-center rounded-full bg-emerald-500 px-8 font-medium text-black shadow hover:brightness-95"
-          >KIP Spec →</a
+          class="flex h-12 items-center gap-1 rounded-full bg-emerald-500 px-8 font-medium text-black shadow hover:brightness-95"
+          ><span>KIP Spec</span><span><ArrowRightLine /></span></a
         >
         <a
           href="#project-andadb"
-          class="inline-flex h-12 items-center rounded-full border border-black/10 bg-white/10 px-8 font-medium backdrop-blur hover:bg-white/20"
-          >Run It In Anda DB</a
+          class="flex h-12 items-center gap-1 rounded-full border border-black/10 bg-white/10 px-8 font-medium backdrop-blur hover:bg-white/20"
+          ><span>Run It In Anda DB</span><span><ArrowDownLine /></span></a
         >
       </div>
     </div>

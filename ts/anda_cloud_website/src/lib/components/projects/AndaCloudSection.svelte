@@ -2,6 +2,8 @@
   import { fadeIn, parallax } from '$lib/animations/motion'
   import { neuralGrid } from '$lib/animations/neuralGrid'
   import SectionHeading from '$lib/components/SectionHeading.svelte'
+  import ArrowDownLine from '$lib/icons/arrow-down-line.svelte'
+  import ArrowRightLine from '$lib/icons/arrow-right-line.svelte'
 
   const interactionFlow = `Agent A -> register(identity, capabilities)\nRegistry -> challenge(A) -> verify()\nClient -> discovery(query: need=\"pricing oracle\")\nDiscovery+ -> route(candidates)\nAgent B <- payment(X402) via PaymentSvc\nGateway -> bridge(external_agent) -> issue temp identity`
   const trustSignals = `Signals = {\n  uptime,\n  responsiveness,\n  attestation(TeeReport?),\n  settlement_history,\n  capability_accuracy,\n  reputation_endorsements\n}`
@@ -65,14 +67,16 @@
         <a
           href="https://github.com/ldclabs/anda-cloud"
           target="_blank"
-          class="inline-flex h-12 items-center rounded-full bg-emerald-500 px-8 font-medium text-black shadow hover:brightness-95"
-          >Source Code →</a
+          class="flex h-12 items-center gap-1 rounded-full bg-emerald-500 px-8 font-medium text-black shadow hover:brightness-95"
         >
+          <span>Source Code</span><span><ArrowRightLine /></span>
+        </a>
         <a
           href="#get-started"
-          class="inline-flex h-12 items-center rounded-full border border-black/10 bg-white/10 px-8 font-medium backdrop-blur hover:bg-white/20"
-          >Get Started</a
+          class="flex h-12 items-center gap-1 rounded-full border border-black/10 bg-white/10 px-8 font-medium backdrop-blur hover:bg-white/20"
         >
+          <span>Get Started</span><span><ArrowDownLine /></span>
+        </a>
       </div>
     </div>
   </div>

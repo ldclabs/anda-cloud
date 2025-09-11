@@ -1,6 +1,8 @@
 <script lang="ts">
   import { fadeIn, parallax } from '$lib/animations/motion'
   import { neuralGrid } from '$lib/animations/neuralGrid'
+  import ArrowDownLine from '$lib/icons/arrow-down-line.svelte'
+  import ArrowRightLine from '$lib/icons/arrow-right-line.svelte'
 
   const codeSnippet = `impl MemoryManagement {
   pub async fn connect(db: Arc<AndaDB>, nexus: Arc<CognitiveNexus>) -> Result<Self, BoxError> {
@@ -91,13 +93,13 @@
         <a
           href="https://github.com/ldclabs/anda-db"
           target="_blank"
-          class="inline-flex h-12 items-center rounded-full bg-emerald-500 px-8 font-medium text-black shadow hover:brightness-95"
-          >Source Code →</a
+          class="flex h-12 items-center gap-1 rounded-full bg-emerald-500 px-8 font-medium text-black shadow hover:brightness-95"
+          ><span>Source Code</span><span><ArrowRightLine /></span></a
         >
         <a
           href="#project-andacloud"
-          class="inline-flex h-12 items-center rounded-full border border-black/10 px-8 font-medium hover:bg-black/5"
-          >Cloud Layer</a
+          class="flex h-12 items-center gap-1 rounded-full border border-black/10 bg-white/10 px-8 font-medium backdrop-blur hover:bg-white/20"
+          ><span>Cloud Layer</span><span><ArrowDownLine /></span></a
         >
       </div>
     </div>

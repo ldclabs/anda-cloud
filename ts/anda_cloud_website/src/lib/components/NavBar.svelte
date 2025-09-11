@@ -6,7 +6,7 @@
     { href: '#project-anda', label: 'Anda' },
     { href: '#project-andadb', label: 'Anda DB' },
     { href: '#project-andacloud', label: 'Anda Cloud' },
-    { href: 'https://x.com/ICPandaDAO', label: 'Follow Usˆ', external: true }
+    { href: '#about', label: 'About' }
   ]
 
   // Props / state
@@ -134,22 +134,11 @@
     </a>
     <div class="ml-auto hidden items-center gap-1 md:flex">
       {#each navItems as item}
-        {#if !item.external}
-          <a
-            href={item.href}
-            class="relative rounded-md px-3 py-2 text-sm font-medium ${navItemCss}"
-          >
-            {item.label}
-          </a>
-        {:else}
-          <a
-            href={item.href}
-            target="_blank"
-            rel="noopener"
-            class="relative rounded-md px-3 py-2 text-sm font-medium ${navItemCss}"
-            >{item.label}</a
-          >
-        {/if}
+        <a
+          href={item.href}
+          class="relative rounded-md px-3 py-2 text-sm font-medium ${navItemCss}"
+          >{item.label}</a
+        >
       {/each}
     </div>
     <button

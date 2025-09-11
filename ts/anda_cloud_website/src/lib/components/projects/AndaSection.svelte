@@ -1,6 +1,8 @@
 <script lang="ts">
   import { fadeIn, parallax } from '$lib/animations/motion'
   import { neuralGrid } from '$lib/animations/neuralGrid'
+  import ArrowDownLine from '$lib/icons/arrow-down-line.svelte'
+  import ArrowRightLine from '$lib/icons/arrow-right-line.svelte'
 
   const codeSnippet = `anda/
 ├── anda_core/        # Core library containing base types and interfaces
@@ -66,13 +68,13 @@
         <a
           href="https://github.com/ldclabs/anda"
           target="_blank"
-          class="inline-flex h-12 items-center rounded-full bg-emerald-500 px-8 font-medium text-black shadow hover:brightness-95"
-          >Source Code →</a
+          class="flex h-12 items-center gap-1 rounded-full bg-emerald-500 px-8 font-medium text-black shadow hover:brightness-95"
+          ><span>Source Code</span><span><ArrowRightLine /></span></a
         >
         <a
           href="#project-kip"
-          class="inline-flex h-12 items-center rounded-full border border-black/10 px-8 font-medium hover:bg-black/5"
-          >Memory Layer</a
+          class="flex h-12 items-center gap-1 rounded-full border border-black/10 px-8 font-medium hover:bg-black/5"
+          ><span>Memory Layer</span><span><ArrowDownLine /></span></a
         >
       </div>
     </div>
