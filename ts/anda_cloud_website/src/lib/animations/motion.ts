@@ -50,20 +50,23 @@ interface ParallaxOptions {
   initialDelayFrames?: number // 延迟若干 rAF 以等待布局/字体稳定
   maxOffset?: number // 绝对值最大位移（可选）
   startWithinPx?: number // 当元素顶部距离视口底部 <= 该值时即开始 (允许下一屏预先参与)
+  disableBelow?: number // 视口宽度低于该值时禁用（移动端避免重叠）
 }
 export function parallax(node: HTMLElement, opts: ParallaxOptions = {}) {
   const {
-    speed = 0.25,
+    speed = 0.12,
     clamp = true,
     initialDelayFrames = 2,
     maxOffset,
-    startWithinPx = 200
+    startWithinPx = 200,
+    disableBelow = 768
   } = opts
 
   let frame: number | null = null
   let baseY = 0
   let delayLeft = Math.max(0, initialDelayFrames)
   let firstApply = true
+  let disabledByWidth = false
 
   function computeBase() {
     baseY = node.getBoundingClientRect().top + window.scrollY
@@ -72,6 +75,7 @@ export function parallax(node: HTMLElement, opts: ParallaxOptions = {}) {
 
   function apply() {
     frame = null
+    if (disabledByWidth) return
     if (delayLeft > 0) {
       delayLeft--
       computeBase() // 期间再刷新一次基准
@@ -109,10 +113,32 @@ export function parallax(node: HTMLElement, opts: ParallaxOptions = {}) {
   }
   function onResize() {
     computeBase()
+    // 判断是否需要禁用
+    if (disableBelow && window.innerWidth < disableBelow) {
+      if (!disabledByWidth) {
+        disabledByWidth = true
+        // 清除 transform 以还原正常文档流
+        node.style.transform = ''
+      }
+      return
+    } else if (
+      disabledByWidth &&
+      (!disableBelow || window.innerWidth >= disableBelow)
+    ) {
+      // 恢复
+      disabledByWidth = false
+      firstApply = true
+    }
     schedule()
   }
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('resize', onResize)
+
+  // 初始宽度判定
+  if (disableBelow && window.innerWidth < disableBelow) {
+    disabledByWidth = true
+    node.style.transform = ''
+  }
 
   // 初始两帧稳定
   schedule()

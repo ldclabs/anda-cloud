@@ -3,7 +3,6 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-
 }
 
 @layer base {

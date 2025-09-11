@@ -36,11 +36,11 @@
 <section
   id="project-andadb"
   use:neuralGrid
-  class="section-light relative flex min-h-screen items-center overflow-hidden will-change-transform"
+  class="section-light relative flex min-h-screen items-center overflow-hidden py-24 will-change-transform"
 >
   <div
-    use:parallax={{ speed: 0.1 }}
-    class="mx-auto grid w-full max-w-6xl items-center gap-20 px-6 lg:grid-cols-2"
+    use:parallax
+    class="mx-auto grid w-full max-w-6xl items-center gap-20 px-4 lg:grid-cols-2"
   >
     <div use:fadeIn={{ y: 40, duration: 600 }}>
       <h2 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl"
@@ -101,16 +101,14 @@
         >
       </div>
     </div>
-    <div class="relative">
-      <div class="relative" use:fadeIn={{ y: 40, duration: 700, delay: 120 }}>
-        <div
-          class="grid gap-6 rounded-xl border border-white/10 bg-black p-2 text-xs shadow"
+    <div class="relative" use:fadeIn={{ y: 40, duration: 700, delay: 120 }}>
+      <div
+        class="grid rounded-xl border border-white/10 bg-black p-2 text-xs shadow"
+      >
+        <pre
+          class="overflow-auto rounded-lg p-2 [font-family:ui-monospace,monospace] leading-relaxed text-white"
+          ><code>{codeSnippet}</code></pre
         >
-          <pre
-            class="overflow-auto rounded-lg p-2 [font-family:ui-monospace,monospace] leading-relaxed text-white"
-            ><code>{codeSnippet}</code></pre
-          >
-        </div>
       </div>
     </div>
   </div>

@@ -56,11 +56,11 @@ WITH METADATA {
 <section
   id="project-kip"
   use:neuralGrid={{ palette: 'dark' }}
-  class="section-dark relative flex min-h-screen items-center overflow-hidden will-change-transform"
+  class="section-dark relative flex min-h-screen items-center overflow-hidden py-24 will-change-transform"
 >
   <div
-    use:parallax={{ speed: 0.1 }}
-    class="mx-auto grid w-full max-w-6xl items-start gap-20 lg:grid-cols-2"
+    use:parallax
+    class="mx-auto grid w-full max-w-6xl items-center gap-20 px-4 lg:grid-cols-2"
   >
     <div use:fadeIn={{ y: 40, duration: 600 }}>
       <h2 class="mb-6 text-4xl font-semibold tracking-tight md:text-5xl"
@@ -136,9 +136,7 @@ WITH METADATA {
             : 'text-[var(--color-text-dim)]'}">META</button
         >
       </div>
-      <div
-        class="relative overflow-hidden rounded-xl border border-white/10 bg-white/90 shadow"
-      >
+      <div class="grid rounded-xl border border-white/10 bg-white/90 shadow">
         <div
           class="border-b border-white/5 px-4 py-2 text-xs tracking-wider text-black/50 uppercase"
           >{tab === 'kql'
@@ -148,12 +146,14 @@ WITH METADATA {
               : 'Introspection / META'}</div
         >
         <pre
-          class="max-h-[420px] overflow-auto p-5 [font-family:ui-monospace,monospace] text-xs leading-relaxed text-black"
-          >{tab === 'kql'
-            ? kqlExample
-            : tab === 'kml'
-              ? kmlExample
-              : metaExample}</pre
+          class="max-h-[420px] overflow-auto p-2 [font-family:ui-monospace,monospace] text-xs leading-relaxed text-black"
+          ><code
+            >{tab === 'kql'
+              ? kqlExample
+              : tab === 'kml'
+                ? kmlExample
+                : metaExample}</code
+          ></pre
         >
       </div>
     </div>

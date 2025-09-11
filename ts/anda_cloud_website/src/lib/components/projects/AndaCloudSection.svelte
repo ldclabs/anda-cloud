@@ -12,7 +12,7 @@
   use:neuralGrid={{ palette: 'dark' }}
   class="section-dark relative max-h-[1536px] min-h-screen py-24"
 >
-  <div use:parallax={{ speed: 0.1 }} class="mx-auto w-full max-w-6xl">
+  <div use:parallax class="mx-auto w-full max-w-6xl px-4">
     <div
       use:fadeIn={{ y: 40, duration: 600 }}
       class="relative mx-auto max-w-4xl px-4 text-center"

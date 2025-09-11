@@ -166,14 +166,6 @@ body {
     rgba(255, 255, 255, 0)
   );
 }
-/* Dense variant */
-.section-light.grid-dense::before {
-  background-size:
-    24px 24px,
-    24px 24px,
-    100% 100%,
-    100% 100%;
-}
 
 /* Dark section subtle inverse grid */
 .section-dark::before {
@@ -210,13 +202,6 @@ body {
   mix-blend-mode: normal;
   opacity: 0; /* start hidden for fade-in */
   transition: opacity 900ms ease;
-}
-.section-dark.grid-dense::before {
-  background-size:
-    24px 24px,
-    24px 24px,
-    100% 100%,
-    100% 100%;
 }
 
 /* Reveal state (applies to both light & dark) */

@@ -2,7 +2,7 @@
   import '../app.css'
   import '../lib/styles/theme.css'
 
-  let { children } = $props();
+  let { children } = $props()
 </script>
 
 {@render children()}

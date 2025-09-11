@@ -3,15 +3,7 @@
 // Respects prefers-reduced-motion.
 
 interface NeuralGridOptions {
-  spacing?: number // grid spacing; if omitted, inferred: 24 if .grid-dense else 40
-  speed?: number // px per frame (approx, scaled by DPR)
-  thickness?: number // line thickness
-  pulseLength?: number // visual length of each pulse (px)
-  maxPulses?: number // cap active pulses
-  ambientIntervalMs?: number // ambient spawn interval
-  palette?: 'auto' | 'blue' | 'dark' // color palette mode
-  pointerIntervalMs?: number // minimum ms between pointer spawns
-  pointerMinDistance?: number // minimum cursor travel before spawn (px)
+  palette?: 'auto' | 'blue' | 'dark'
 }
 
 type Pulse = {
@@ -27,13 +19,12 @@ export function neuralGrid(node: HTMLElement, opts: NeuralGridOptions = {}) {
   const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
   if (mql.matches) return {}
 
-  const spacing =
-    opts.spacing ?? (node.classList.contains('grid-dense') ? 24 : 40)
-  const speed = opts.speed ?? 6 // px per frame
-  const thickness = opts.thickness ?? 2.2
-  const pulseLength = opts.pulseLength ?? 120
-  const maxPulses = opts.maxPulses ?? 140
-  const ambientIntervalMs = opts.ambientIntervalMs ?? 3000
+  const spacing = 40
+  const SPEED = 6
+  const THICKNESS = 2
+  const PULSE_LEN = 118
+  const MAX_PULSES = 80
+  const AMBIENT_MS = 2600
   const palette = opts.palette ?? 'auto'
   const effectivePalette =
     palette === 'auto'
@@ -41,8 +32,8 @@ export function neuralGrid(node: HTMLElement, opts: NeuralGridOptions = {}) {
         ? 'dark'
         : 'blue'
       : palette
-  const pointerIntervalMs = opts.pointerIntervalMs ?? 1000
-  const pointerMinDistance = opts.pointerMinDistance ?? spacing * 0.65
+  const POINTER_INTERVAL_MS = 1800
+  const POINTER_MIN_DISTANCE = spacing * 0.7
 
   const canvas = document.createElement('canvas')
   Object.assign(canvas.style, {
@@ -106,7 +97,7 @@ export function neuralGrid(node: HTMLElement, opts: NeuralGridOptions = {}) {
       ['v', -1]
     ]
     for (const [dir, sign] of dirs) {
-      if (pulses.length >= maxPulses) break
+      if (pulses.length >= MAX_PULSES) break
       pulses.push({
         x: gx,
         y: gy,
@@ -119,7 +110,7 @@ export function neuralGrid(node: HTMLElement, opts: NeuralGridOptions = {}) {
   }
 
   function ambientSpawn(now: number) {
-    if (now - lastAmbient < ambientIntervalMs) return
+    if (now - lastAmbient < AMBIENT_MS) return
     lastAmbient = now
     // Random intersection near center bias
     const biasX = width / 2 + (Math.random() - 0.5) * width * 0.6
@@ -133,8 +124,8 @@ export function neuralGrid(node: HTMLElement, opts: NeuralGridOptions = {}) {
     ambientSpawn(now)
     ctx!.lineCap = 'round'
     for (const p of pulses) {
-      p.dist += speed
-      const len = pulseLength
+      p.dist += SPEED
+      const len = PULSE_LEN
       const start = p.dist - len
       if (p.dir === 'h') {
         const x1 = p.x + start * p.sign
@@ -200,7 +191,7 @@ export function neuralGrid(node: HTMLElement, opts: NeuralGridOptions = {}) {
       grd.addColorStop(1, `hsla(${p.hue + 18}, 98%, 75%, 0.95)`)
     }
     ctx!.strokeStyle = grd
-    ctx!.lineWidth = thickness
+    ctx!.lineWidth = THICKNESS
     ctx!.beginPath()
     ctx!.moveTo(x1, y1)
     ctx!.lineTo(x2, y2)
@@ -213,15 +204,15 @@ export function neuralGrid(node: HTMLElement, opts: NeuralGridOptions = {}) {
   let lastPY = -9999
   function pointer(e: PointerEvent) {
     if (!running) return
-    if (pulses.length > maxPulses * 0.9) return // avoid overload
+    if (pulses.length > MAX_PULSES * 0.9) return // avoid overload
     const now = performance.now()
-    if (now - lastPointerTime < pointerIntervalMs) return
+    if (now - lastPointerTime < POINTER_INTERVAL_MS) return
     const rect = node.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
     const dx = x - lastPX
     const dy = y - lastPY
-    if (Math.hypot(dx, dy) < pointerMinDistance) return
+    if (Math.hypot(dx, dy) < POINTER_MIN_DISTANCE) return
     lastPointerTime = now
     lastPX = x
     lastPY = y

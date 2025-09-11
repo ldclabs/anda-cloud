@@ -3,7 +3,7 @@
 </script>
 
 <section
-  class="section-dark relative flex min-h-screen items-center overflow-hidden"
+  class="section-dark relative mt-20 flex min-h-screen items-center overflow-hidden md:mt-0"
 >
   <div class="relative m-auto grid max-w-6xl md:grid-cols-2 md:items-center">
     <div class="m-auto" aria-hidden="true">
