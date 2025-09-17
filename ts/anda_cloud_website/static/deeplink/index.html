@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport" />
-  <title>Anda.AI - Build the Future of AI Agents</title>
+  <title>Anda.AI - Infrastructure for Autonomous AI Agents</title>
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -78,6 +78,35 @@
     const search = new URLSearchParams(window.location.search)
     const nextUrl = window.location.href.replace(/^.*deeplink/i, "anda://deeplink")
     const openBtn = document.getElementById('open-app')
+    const delegationStore = 'https://asxpf-ciaaa-aaaap-an33a-cai.icp0.io/delegation'
+
+    async function handleDelegation() {
+      // https://anda.ai/deeplink/?os=macos&action=SignIn#pGFhYGFkgqJhZKJhZRs..1gteG
+      if (search.get('action') !== 'SignIn') return
+      const payload = window.location.hash.slice(1)  // Skip leading '#'
+
+      const res = await fetch(delegationStore, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload })
+      }).then(r => r.json())
+
+      let counter = 0
+      const pubkey = res.result.replaceAll('=', '')  // Remove trailing '='
+
+      await new Promise(r => setTimeout(r, 3000))
+      try {
+        const r = await fetch(delegationStore + `?pubkey=${pubkey}`, {
+          method: 'GET',
+          mode: 'cors',
+          headers: { 'Accept': 'application/json' },
+        }).then(r => r.json())
+        statusElement.textContent = 'Signed in to Anda AI App. You may now close this page'
+      } catch (e) {
+        console.warn(e)
+      }
+    }
 
     // Copy text to clipboard with secure-context API and a fallback for older browsers.
     function copyTextToClipboard(text) {
@@ -136,7 +165,11 @@
     // const isMacOS = () => (navigator.platform && navigator.platform.toLowerCase().includes('mac')) || /Macintosh|Mac OS X/.test(navigator.userAgent)
 
     // Auto-attempt on macOS (excluding Edge which often blocks non-gesture external protocol navigations)
-    if (search.get('os') != 'windows') {
+    if (search.get('os') == 'windows') {
+      handleDelegation().catch(console.error)
+    } else {
+      // optional, if deeplink works, we don't need to handle delegation
+      handleDelegation().catch(console.error)
       let switchedAuto = false
       const onVisibilityAuto = () => {
         if (document.visibilityState === 'hidden') {
@@ -152,6 +185,7 @@
         } catch (err) {
           console.error('Error redirecting to desktop app (auto):', err)
         }
+
         setTimeout(() => {
           if (!switchedAuto) {
             statusElement.textContent = 'If the app did not launch, please click the button'
