@@ -288,7 +288,7 @@ impl TestCanister {
             .with_application_subnet()
             .with_ii_subnet()
             .with_fiduciary_subnet()
-            .with_nonmainnet_features(true)
+            // .with_nonmainnet_features(true)
             .build();
 
         let canister = pic.create_canister();

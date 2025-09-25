@@ -9,7 +9,7 @@ strip = true
 opt-level = 's'
 
 [workspace.package]
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 repository = "https://github.com/ldclabs/anda-cloud"
 keywords = ["anda", "agent", "icp", "cloud"]
@@ -37,7 +37,7 @@ url = "2.5"
 thiserror = "2"
 rand = "0.9"
 tokio = { version = "1" }
-pocket-ic = "9"
+pocket-ic = "10"
 
 [workspace.metadata.cargo-shear]
 ignored = ["ic-dummy-getrandom-for-wasm"]
