@@ -36,6 +36,15 @@ static IC_CERTIFICATE_EXPRESSION_HEADER: &str = "ic-certificateexpression";
 // https://lfcwh-piaaa-aaaap-an2fa-cai.icp0.io/lookup?id=nprym-ylvyz-ig3fr-lgcmn-zzzt4-tyuix-3v6bm-fsel7-6lq6x-zh2w7-zqe
 #[ic_cdk::query(hidden = true)]
 async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
+    if request.method().as_str() == "POST" {
+        return HttpResponse {
+            status_code: 200,
+            headers: vec![],
+            body: b"Upgrade".to_vec().into(),
+            upgrade: Some(true),
+        };
+    }
+
     let witness = store::state::http_tree_with(|t| {
         t.witness(&store::state::DEFAULT_CERT_ENTRY, request.url())
             .expect("get witness failed")
