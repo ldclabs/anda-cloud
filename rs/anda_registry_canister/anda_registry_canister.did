@@ -12,6 +12,7 @@ type Agent = record {
 };
 type AgentInfo = record {
   handle_canister : opt principal;
+  provider : opt AgentProvider;
   payments : vec PaymentProtocol;
   endpoint : text;
   name : text;
@@ -20,6 +21,12 @@ type AgentInfo = record {
   handle : text;
 };
 type AgentProtocol = variant { A2A; MCP; ANDA };
+type AgentProvider = record {
+  id : principal;
+  url : text;
+  logo : text;
+  name : text;
+};
 type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
 type ChallengeEnvelope = record {
   authentication : SignedEnvelope;

@@ -16,6 +16,7 @@ module {
   };
   public type AgentInfo = {
     handle_canister : ?Principal;
+    provider : ?AgentProvider;
     payments : [PaymentProtocol];
     endpoint : Text;
     name : Text;
@@ -24,6 +25,12 @@ module {
     handle : Text;
   };
   public type AgentProtocol = { #A2A; #MCP; #ANDA };
+  public type AgentProvider = {
+    id : Principal;
+    url : Text;
+    logo : Text;
+    name : Text;
+  };
   public type ChainArgs = { #Upgrade : UpgradeArgs; #Init : InitArgs };
   public type ChallengeEnvelope = {
     authentication : SignedEnvelope;

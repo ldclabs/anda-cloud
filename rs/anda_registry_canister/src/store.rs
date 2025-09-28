@@ -111,6 +111,9 @@ pub struct AgentInfoLocal {
 
     #[serde(rename = "pm")]
     payments: BTreeSet<PaymentProtocol>,
+
+    #[serde(rename = "pv")]
+    provider: Option<AgentProvider>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -134,6 +137,7 @@ impl From<AgentInfo> for AgentInfoLocal {
             endpoint: info.endpoint,
             protocols: info.protocols,
             payments: info.payments,
+            provider: info.provider,
         }
     }
 }
@@ -148,6 +152,7 @@ impl From<AgentInfoLocal> for AgentInfo {
             endpoint: info.endpoint,
             protocols: info.protocols,
             payments: info.payments,
+            provider: info.provider,
         }
     }
 }
@@ -407,9 +412,10 @@ pub mod state {
             })?;
 
         if let Ok(user) = rt
-            && user.id == owner {
-                return Ok(());
-            }
+            && user.id == owner
+        {
+            return Ok(());
+        }
 
         Err(RegistryError::BadRequest {
             error: format!("handle {handle:?} is not belong to {owner}"),
@@ -699,6 +705,7 @@ mod tests {
             endpoint: "https://example.com".to_string(),
             protocols: BTreeMap::new(),
             payments: BTreeSet::new(),
+            provider: None,
         }
     }
 

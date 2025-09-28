@@ -92,6 +92,9 @@ pub struct AgentInfo {
     /// Payment protocols the agent supports.
     /// (e.g. ["X402"])
     pub payments: BTreeSet<PaymentProtocol>,
+
+    /// Information about the agent's service provider.
+    pub provider: Option<AgentProvider>,
 }
 
 impl AgentInfo {
@@ -142,6 +145,59 @@ impl AgentInfo {
                 return Err(format!("protocol {protocol:?} is not a valid URL"));
             }
         }
+
+        if let Some(provider) = &self.provider {
+            provider.validate()?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Information about the agent's service provider.
+#[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
+pub struct AgentProvider {
+    /// The unique identifier of the agent provider.
+    pub id: Principal,
+    /// The name of the agent provider's organization.
+    pub name: String,
+    /// The agent provider's logo.
+    pub logo: String,
+    /// A URL for the agent provider's website or relevant documentation.
+    pub url: String,
+}
+
+impl AgentProvider {
+    /// Validates the agent provider information to ensure it meets system requirements.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.is_empty() {
+            return Err("provider name is required".to_string());
+        }
+
+        if self.name.trim() != self.name {
+            return Err("provider name cannot contain leading or trailing whitespace".to_string());
+        }
+
+        if self.name.len() > 32 {
+            return Err("provider name cannot be longer than 32 bytes".to_string());
+        }
+
+        if !self.logo.starts_with("https://") {
+            return Err("provider logo should start with https://".to_string());
+        }
+
+        if url::Url::parse(&self.logo).is_err() {
+            return Err("provider logo is not a valid URL".to_string());
+        }
+
+        if !self.url.starts_with("https://") {
+            return Err("provider url should start with https://".to_string());
+        }
+
+        if url::Url::parse(&self.url).is_err() {
+            return Err("provider url is not a valid URL".to_string());
+        }
+
         Ok(())
     }
 }

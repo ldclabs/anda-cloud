@@ -16,6 +16,7 @@ export interface Agent {
 }
 export interface AgentInfo {
   'handle_canister' : [] | [Principal],
+  'provider' : [] | [AgentProvider],
   'payments' : Array<PaymentProtocol>,
   'endpoint' : string,
   'name' : string,
@@ -26,6 +27,12 @@ export interface AgentInfo {
 export type AgentProtocol = { 'A2A' : null } |
   { 'MCP' : null } |
   { 'ANDA' : null };
+export interface AgentProvider {
+  'id' : Principal,
+  'url' : string,
+  'logo' : string,
+  'name' : string,
+}
 export type ChainArgs = { 'Upgrade' : UpgradeArgs } |
   { 'Init' : InitArgs };
 export interface ChallengeEnvelope {
