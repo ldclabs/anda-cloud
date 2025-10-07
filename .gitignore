@@ -20,3 +20,4 @@ target/
 .dfx
 
 # Cargo.lock
+proposal-message.json
