@@ -13,14 +13,18 @@ type Agent = record {
 type AgentInfo = record {
   handle_canister : opt principal;
   provider : opt AgentProvider;
-  payments : vec PaymentProtocol;
   endpoint : text;
   name : text;
-  protocols : vec record { AgentProtocol; text };
+  protocols : vec AgentProtocol;
   description : text;
   handle : text;
+  image : text;
 };
-type AgentProtocol = variant { A2A; MCP; ANDA };
+type AgentProtocol = record {
+  endpoint : text;
+  name : text;
+  version : opt text;
+};
 type AgentProvider = record {
   id : principal;
   url : text;
@@ -46,7 +50,6 @@ type InitArgs = record {
   name : text;
   challenge_expires_in_ms : nat64;
 };
-type PaymentProtocol = variant { X402 };
 type RegistryError = variant {
   NotFound : record { handle : text };
   Generic : record { error : text };

@@ -17,16 +17,18 @@ export interface Agent {
 export interface AgentInfo {
   'handle_canister' : [] | [Principal],
   'provider' : [] | [AgentProvider],
-  'payments' : Array<PaymentProtocol>,
   'endpoint' : string,
   'name' : string,
-  'protocols' : Array<[AgentProtocol, string]>,
+  'protocols' : Array<AgentProtocol>,
   'description' : string,
   'handle' : string,
+  'image' : string,
 }
-export type AgentProtocol = { 'A2A' : null } |
-  { 'MCP' : null } |
-  { 'ANDA' : null };
+export interface AgentProtocol {
+  'endpoint' : string,
+  'name' : string,
+  'version' : [] | [string],
+}
 export interface AgentProvider {
   'id' : Principal,
   'url' : string,
@@ -57,7 +59,6 @@ export interface InitArgs {
   'name' : string,
   'challenge_expires_in_ms' : bigint,
 }
-export type PaymentProtocol = { 'X402' : null };
 export type RegistryError = { 'NotFound' : { 'handle' : string } } |
   { 'Generic' : { 'error' : string } } |
   { 'Unauthorized' : { 'error' : string } } |

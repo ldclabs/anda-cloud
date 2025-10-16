@@ -14,7 +14,6 @@ use pocket_ic::{PocketIc, PocketIcBuilder};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use std::{
-    collections::{BTreeMap, BTreeSet},
     ops::Add,
     path::Path,
     time::{Duration, SystemTime},
@@ -48,17 +47,18 @@ fn anda_registry_canister_should_work() {
             handle: "test_agent".to_string(),
             handle_canister: None,
             name: "Test Agent".to_string(),
+            image: "https://example.com/image.png".to_string(),
             description: "test agent".to_string(),
             endpoint: "https://test.agent/endpoint".to_string(),
-            protocols: BTreeMap::from([(
-                AgentProtocol::ANDA,
-                format!(
+            protocols: vec![AgentProtocol {
+                name: "ANDA".to_string(),
+                endpoint: format!(
                     "https://test.agent/.well-known/agents/{}",
                     agent_id.sender().unwrap()
                 ),
-            )]),
-            payments: BTreeSet::new(),
-            provider: None,
+                version: Some("v1".to_string()),
+            }],
+            ..Default::default()
         },
         created_at: unix_timestamp().as_millis() as u64,
         authentication: None,
@@ -114,15 +114,15 @@ fn anda_registry_canister_should_work() {
                 name: "Anda".to_string(),
                 description: "test agent".to_string(),
                 endpoint: "https://test.agent/endpoint".to_string(),
-                protocols: BTreeMap::from([(
-                    AgentProtocol::ANDA,
-                    format!(
+                protocols: vec![AgentProtocol {
+                    name: "ANDA".to_string(),
+                    endpoint: format!(
                         "https://test.agent/.well-known/agents/{}",
                         agent_id.sender().unwrap()
                     ),
-                )]),
-                payments: BTreeSet::new(),
-                provider: None,
+                    version: Some("v1".to_string()),
+                }],
+                ..Default::default()
             },
             created_at: unix_timestamp().as_millis() as u64,
             authentication: None,
@@ -153,15 +153,15 @@ fn anda_registry_canister_should_work() {
                 name: "Anda".to_string(),
                 description: "test agent".to_string(),
                 endpoint: "https://test.agent/endpoint".to_string(),
-                protocols: BTreeMap::from([(
-                    AgentProtocol::ANDA,
-                    format!(
+                protocols: vec![AgentProtocol {
+                    name: "ANDA".to_string(),
+                    endpoint: format!(
                         "https://test.agent/.well-known/agents/{}",
                         agent_id.sender().unwrap()
                     ),
-                )]),
-                payments: BTreeSet::new(),
-                provider: None,
+                    version: Some("v1".to_string()),
+                }],
+                ..Default::default()
             },
             created_at: unix_timestamp().as_millis() as u64,
             authentication: None,
@@ -222,15 +222,15 @@ fn anda_registry_canister_should_work() {
                     name: "Anda 2".to_string(),
                     description: "test agent".to_string(),
                     endpoint: "https://test.agent/endpoint".to_string(),
-                    protocols: BTreeMap::from([(
-                        AgentProtocol::ANDA,
-                        format!(
+                    protocols: vec![AgentProtocol {
+                        name: "ANDA".to_string(),
+                        endpoint: format!(
                             "https://test.agent/.well-known/agents/{}",
                             agent_id.sender().unwrap()
                         ),
-                    )]),
-                    payments: BTreeSet::new(),
-                    provider: None,
+                        version: Some("v1".to_string()),
+                    }],
+                    ..Default::default()
                 },
                 created_at: unix_timestamp().as_millis() as u64,
                 authentication: None,

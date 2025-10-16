@@ -17,14 +17,14 @@ module {
   public type AgentInfo = {
     handle_canister : ?Principal;
     provider : ?AgentProvider;
-    payments : [PaymentProtocol];
     endpoint : Text;
     name : Text;
-    protocols : [(AgentProtocol, Text)];
+    protocols : [AgentProtocol];
     description : Text;
     handle : Text;
+    image : Text;
   };
-  public type AgentProtocol = { #A2A; #MCP; #ANDA };
+  public type AgentProtocol = { endpoint : Text; name : Text; version : ?Text };
   public type AgentProvider = {
     id : Principal;
     url : Text;
@@ -50,7 +50,6 @@ module {
     name : Text;
     challenge_expires_in_ms : Nat64;
   };
-  public type PaymentProtocol = { #X402 };
   public type RegistryError = {
     #NotFound : { handle : Text };
     #Generic : { error : Text };

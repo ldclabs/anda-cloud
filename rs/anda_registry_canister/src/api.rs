@@ -65,8 +65,7 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         input.tee,
         code.into(),
         now_ms,
-    )
-    .await?;
+    )?;
 
     store::state::notify_subscribers(AgentEvent {
         id: agent,
@@ -130,8 +129,7 @@ pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
         input.request.code,
         new_code.into(),
         now_ms,
-    )
-    .await?;
+    )?;
 
     store::state::notify_subscribers(AgentEvent {
         id: agent,

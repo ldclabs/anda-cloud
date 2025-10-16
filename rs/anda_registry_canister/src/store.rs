@@ -1,5 +1,5 @@
 use anda_cloud_cdk::{
-    PaymentProtocol, TEEInfo, TEEKind,
+    TEEInfo, TEEKind,
     agent::*,
     registry::{RegistryError, RegistryState},
 };
@@ -25,6 +25,7 @@ use std::{
 
 const MAX_LAST_CHALLENGED: usize = 10000;
 const MAX_HEALTH_POWER_LIST: usize = 1000;
+const TRIM_STEP: usize = 100;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -100,20 +101,84 @@ pub struct AgentInfoLocal {
     #[serde(rename = "n")]
     name: String,
 
+    #[serde(rename = "i")]
+    image: String,
+
     #[serde(rename = "d")]
     description: String,
 
     #[serde(rename = "e")]
     endpoint: String,
 
-    #[serde(rename = "p")]
-    protocols: BTreeMap<AgentProtocol, String>,
-
-    #[serde(rename = "pm")]
-    payments: BTreeSet<PaymentProtocol>,
+    #[serde(rename = "ps")]
+    protocols: Vec<AgentProtocolLocal>,
 
     #[serde(rename = "pv")]
-    provider: Option<AgentProvider>,
+    provider: Option<AgentProviderLocal>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AgentProtocolLocal {
+    #[serde(rename = "n")]
+    pub name: String,
+    #[serde(rename = "e")]
+    pub endpoint: String,
+    #[serde(rename = "v")]
+    pub version: Option<String>,
+}
+
+impl From<AgentProtocol> for AgentProtocolLocal {
+    fn from(info: AgentProtocol) -> Self {
+        Self {
+            name: info.name,
+            endpoint: info.endpoint,
+            version: info.version,
+        }
+    }
+}
+
+impl From<AgentProtocolLocal> for AgentProtocol {
+    fn from(info: AgentProtocolLocal) -> Self {
+        Self {
+            name: info.name,
+            endpoint: info.endpoint,
+            version: info.version,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AgentProviderLocal {
+    pub id: Principal,
+
+    #[serde(rename = "n")]
+    pub name: String,
+    #[serde(rename = "l")]
+    pub logo: String,
+    #[serde(rename = "u")]
+    pub url: String,
+}
+
+impl From<AgentProvider> for AgentProviderLocal {
+    fn from(info: AgentProvider) -> Self {
+        Self {
+            id: info.id,
+            name: info.name,
+            logo: info.logo,
+            url: info.url,
+        }
+    }
+}
+
+impl From<AgentProviderLocal> for AgentProvider {
+    fn from(info: AgentProviderLocal) -> Self {
+        Self {
+            id: info.id,
+            name: info.name,
+            logo: info.logo,
+            url: info.url,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -125,36 +190,6 @@ pub struct TEEInfoLocal {
 
     #[serde(rename = "u")]
     url: String,
-}
-
-impl From<AgentInfo> for AgentInfoLocal {
-    fn from(info: AgentInfo) -> Self {
-        Self {
-            handle: info.handle,
-            handle_canister: info.handle_canister,
-            name: info.name,
-            description: info.description,
-            endpoint: info.endpoint,
-            protocols: info.protocols,
-            payments: info.payments,
-            provider: info.provider,
-        }
-    }
-}
-
-impl From<AgentInfoLocal> for AgentInfo {
-    fn from(info: AgentInfoLocal) -> Self {
-        Self {
-            handle: info.handle,
-            handle_canister: info.handle_canister,
-            name: info.name,
-            description: info.description,
-            endpoint: info.endpoint,
-            protocols: info.protocols,
-            payments: info.payments,
-            provider: info.provider,
-        }
-    }
 }
 
 impl From<TEEInfo> for TEEInfoLocal {
@@ -174,6 +209,36 @@ impl From<TEEInfoLocal> for TEEInfo {
             kind: info.kind,
             url: info.url,
             attestation: None,
+        }
+    }
+}
+
+impl From<AgentInfo> for AgentInfoLocal {
+    fn from(info: AgentInfo) -> Self {
+        Self {
+            handle: info.handle,
+            handle_canister: info.handle_canister,
+            name: info.name,
+            image: info.image,
+            description: info.description,
+            endpoint: info.endpoint,
+            protocols: info.protocols.into_iter().map(|p| p.into()).collect(),
+            provider: info.provider.map(|p| p.into()),
+        }
+    }
+}
+
+impl From<AgentInfoLocal> for AgentInfo {
+    fn from(info: AgentInfoLocal) -> Self {
+        Self {
+            handle: info.handle,
+            handle_canister: info.handle_canister,
+            name: info.name,
+            image: info.image,
+            description: info.description,
+            endpoint: info.endpoint,
+            protocols: info.protocols.into_iter().map(|p| p.into()).collect(),
+            provider: info.provider.map(|p| p.into()),
         }
     }
 }
@@ -338,15 +403,22 @@ pub mod state {
     pub fn load() {
         STATE_STORE.with_borrow(|rs| {
             STATE.with_borrow_mut(|r| {
-                let v: State =
-                    from_reader(&rs.get()[..]).expect("failed to decode STATE_STORE data");
+                let bytes = rs.get();
+                if bytes.is_empty() {
+                    return;
+                }
+                let v: State = from_reader(&bytes[..]).expect("failed to decode STATE_STORE data");
                 *r = v;
             });
         });
         INDEX_STORE.with_borrow(|rs| {
             INDEX.with_borrow_mut(|r| {
+                let bytes = rs.get();
+                if bytes.is_empty() {
+                    return;
+                }
                 let v: Indexes =
-                    from_reader(&rs.get()[..]).expect("failed to decode INDEX_STORE data");
+                    from_reader(&bytes[..]).expect("failed to decode INDEX_STORE data");
                 *r = v;
             });
         });
@@ -426,7 +498,7 @@ pub mod state {
 pub mod agent {
     use super::*;
 
-    pub async fn register(
+    pub fn register(
         id: Principal,
         challenged_by: Principal,
         info: AgentInfo,
@@ -471,7 +543,7 @@ pub mod agent {
         })
     }
 
-    pub async fn challenge(
+    pub fn challenge(
         id: Principal,
         challenged_by: Principal,
         info: AgentInfo,
@@ -504,13 +576,17 @@ pub mod agent {
                 }
 
                 if now_ms <= agent.challenged_at {
+                    // 幂等保护：不回滚、不改动状态
                     return Ok(());
                 }
 
-                if info.handle != agent.info.handle {
-                    ri.by_handle.remove(&agent.info.handle);
-
-                    if info.handle_canister.is_some() {
+                let old_mapped = agent.info.handle_canister.is_some();
+                let new_mapped = info.handle_canister.is_some();
+                if info.handle != agent.info.handle || old_mapped != new_mapped {
+                    if old_mapped {
+                        ri.by_handle.remove(&agent.info.handle);
+                    }
+                    if new_mapped {
                         ri.by_handle.insert(info.handle.clone(), *idx);
                     }
                 }
@@ -531,17 +607,24 @@ pub mod agent {
                 if agent.health_power > ri.health_power_threshold {
                     ri.by_health_power.insert((agent.health_power, *idx));
                     if ri.by_health_power.len() > MAX_HEALTH_POWER_LIST {
-                        for _ in 0..100 {
+                        for _ in 0..TRIM_STEP {
+                            if ri.by_health_power.is_empty() {
+                                break;
+                            }
                             ri.by_health_power.pop_first();
                         }
-                        ri.health_power_threshold = ri.by_health_power.first().unwrap().0;
+                        ri.health_power_threshold =
+                            ri.by_health_power.first().map(|(hp, _)| *hp).unwrap_or(0);
                     }
                 }
 
                 ri.last_challenged.insert((now_ms, id));
                 if ri.last_challenged.len() > MAX_LAST_CHALLENGED {
-                    for _ in 0..100 {
+                    for _ in 0..TRIM_STEP {
                         // remove 100 oldest challenged agent
+                        if ri.last_challenged.is_empty() {
+                            break;
+                        }
                         ri.last_challenged.pop_first();
                     }
                 }
@@ -701,16 +784,16 @@ mod tests {
             handle,
             handle_canister,
             name: "Test Agent".to_string(),
+            image: "https://example.com/image.png".to_string(),
             description: "Test Description".to_string(),
             endpoint: "https://example.com".to_string(),
-            protocols: BTreeMap::new(),
-            payments: BTreeSet::new(),
+            protocols: Vec::new(),
             provider: None,
         }
     }
 
-    #[tokio::test]
-    async fn test_register() {
+    #[test]
+    fn test_register() {
         setup();
 
         let id = random_principal();
@@ -723,13 +806,11 @@ mod tests {
         let now_ms = 1000;
 
         // 测试注册
-        let result =
-            agent::register(id, challenger, info.clone(), None, code.clone(), now_ms).await;
+        let result = agent::register(id, challenger, info.clone(), None, code.clone(), now_ms);
         assert!(result.is_ok());
 
         // 测试重复注册
-        let result =
-            agent::register(id, challenger, info.clone(), None, code.clone(), now_ms).await;
+        let result = agent::register(id, challenger, info.clone(), None, code.clone(), now_ms);
         assert!(matches!(result, Err(RegistryError::AlreadyExists { .. })));
 
         // 测试获取已注册的代理
@@ -747,8 +828,8 @@ mod tests {
         assert_eq!(agent_by_handle.unwrap().id, id);
     }
 
-    #[tokio::test]
-    async fn test_challenge() {
+    #[test]
+    fn test_challenge() {
         setup();
 
         let id = random_principal();
@@ -761,8 +842,7 @@ mod tests {
         let now_ms = 1000;
 
         // 先注册代理
-        let result =
-            agent::register(id, challenger, info.clone(), None, code.clone(), now_ms).await;
+        let result = agent::register(id, challenger, info.clone(), None, code.clone(), now_ms);
         assert!(result.is_ok());
 
         // 测试挑战
@@ -783,8 +863,7 @@ mod tests {
             wrong_code,
             new_code.clone(),
             new_now_ms,
-        )
-        .await;
+        );
         assert!(matches!(result, Err(RegistryError::BadRequest { .. })));
 
         // 测试正确的挑战码
@@ -796,8 +875,7 @@ mod tests {
             code,
             new_code.clone(),
             new_now_ms,
-        )
-        .await;
+        );
         assert!(result.is_ok());
 
         // 验证挑战后的状态
@@ -815,8 +893,8 @@ mod tests {
         assert_eq!(result.unwrap().id, id);
     }
 
-    #[tokio::test]
-    async fn test_challenge_expired() {
+    #[test]
+    fn test_challenge_expired() {
         setup();
 
         let id = random_principal();
@@ -831,8 +909,7 @@ mod tests {
         });
 
         // 先注册代理
-        let result =
-            agent::register(id, challenger, info.clone(), None, code.clone(), now_ms).await;
+        let result = agent::register(id, challenger, info.clone(), None, code.clone(), now_ms);
         assert!(result.is_ok());
 
         // 测试过期挑战（2小时后）
@@ -849,8 +926,7 @@ mod tests {
             code,
             new_code.clone(),
             new_now_ms,
-        )
-        .await;
+        );
         assert!(result.is_ok());
 
         // 验证挑战后的状态
@@ -861,8 +937,160 @@ mod tests {
         assert_eq!(agent.health_power, 0); // 健康值应该被扣减
     }
 
-    #[tokio::test]
-    async fn test_list_functions() {
+    #[test]
+    fn test_handle_canister_toggle_without_handle_change() {
+        setup();
+
+        let id = random_principal();
+        let challenger = random_principal();
+        let code = random_code();
+
+        // 初始：handle 有 canister，建立 by_handle 映射
+        let info_v1 = create_agent_info(
+            "same_handle".to_string(),
+            Principal::from_text("nscli-qiaaa-aaaaj-qa4pa-cai").ok(),
+        );
+        let now_ms = 1_000;
+        agent::register(id, challenger, info_v1.clone(), None, code, now_ms).unwrap();
+
+        assert!(agent::get_agent_by_handle("same_handle".to_string()).is_ok());
+
+        // 切换为无 canister，但 handle 不变，应移除映射
+        let new_code = random_code();
+        let info_v2 = create_agent_info("same_handle".to_string(), None);
+        let t2 = now_ms + 5_000;
+        agent::challenge(
+            id,
+            challenger,
+            info_v2.clone(),
+            None,
+            agent::get_agent(id).unwrap().challenge_code,
+            new_code,
+            t2,
+        )
+        .unwrap();
+
+        assert!(matches!(
+            agent::get_agent_by_handle("same_handle".to_string()),
+            Err(RegistryError::NotFound { .. })
+        ));
+
+        // 再次切回有 canister，映射应恢复
+        let new_code2 = random_code();
+        let info_v3 = create_agent_info(
+            "same_handle".to_string(),
+            Principal::from_text("nscli-qiaaa-aaaaj-qa4pa-cai").ok(),
+        );
+        let t3 = t2 + 5_000;
+        agent::challenge(
+            id,
+            challenger,
+            info_v3.clone(),
+            None,
+            agent::get_agent(id).unwrap().challenge_code,
+            new_code2,
+            t3,
+        )
+        .unwrap();
+
+        assert!(agent::get_agent_by_handle("same_handle".to_string()).is_ok());
+    }
+
+    #[test]
+    fn test_challenge_idempotent_when_timestamp_not_advanced() {
+        setup();
+
+        let id = random_principal();
+        let challenger = random_principal();
+        let code = random_code();
+        let info = create_agent_info("h".to_string(), None);
+        let t = 1000;
+
+        agent::register(id, challenger, info.clone(), None, code, t).unwrap();
+
+        let before = agent::get_agent(id).unwrap();
+        // 使用相同或更小的 now_ms，按照逻辑应直接 Ok 且不改变状态
+        let res = agent::challenge(
+            id,
+            challenger,
+            info.clone(),
+            None,
+            before.challenge_code.clone(),
+            random_code(),
+            t, // not advanced
+        );
+        assert!(res.is_ok());
+
+        let after = agent::get_agent(id).unwrap();
+        assert_eq!(before.challenge_code, after.challenge_code);
+        assert_eq!(before.challenged_at, after.challenged_at);
+        assert_eq!(before.health_power, after.health_power);
+    }
+
+    #[test]
+    fn test_by_health_power_trim_and_threshold() {
+        setup();
+
+        // 设置更小阈值，便于触发修剪
+        STATE.with_borrow_mut(|s| s.challenge_expires_in_ms = 60_000);
+
+        let challenger = random_principal();
+        let base = 1_000u64;
+
+        // 注册超过 MAX_HEALTH_POWER_LIST 的代理，并逐步提升 health_power
+        let total = MAX_HEALTH_POWER_LIST + 50;
+        let mut ids = Vec::new();
+        for i in 0..total {
+            let id = random_principal();
+            ids.push(id);
+            agent::register(
+                id,
+                challenger,
+                create_agent_info(format!("h{i}"), None),
+                None,
+                random_code(),
+                base + i as u64,
+            )
+            .unwrap();
+        }
+
+        // 对全部做一次挑战，保证 health_power > 0
+        for (i, id) in ids.iter().enumerate() {
+            let a = agent::get_agent(*id).unwrap();
+            let _ = agent::challenge(
+                *id,
+                challenger,
+                create_agent_info(format!("h{i}"), None),
+                None,
+                a.challenge_code,
+                random_code(),
+                base + 10_000 + i as u64,
+            );
+        }
+
+        // 触发修剪分支（内部每次最多移除100个最低值）
+        let _top = agent::list_by_health_power(10, base + 20_000).unwrap();
+        // 无直接对内阈值可见的断言，但至少不应 panic 或越界
+        // 可通过再次挑战提高某个 agent 的分数，验证仍能进入榜单
+        let pick = ids[0];
+        let a = agent::get_agent(pick).unwrap();
+        agent::challenge(
+            pick,
+            challenger,
+            create_agent_info("h_boost".to_string(), None),
+            None,
+            a.challenge_code,
+            random_code(),
+            base + 50_000,
+        )
+        .unwrap();
+
+        let top = agent::list_by_health_power(100, base + 60_000).unwrap();
+        assert!(top.iter().any(|ag| ag.id == pick));
+    }
+
+    #[test]
+    fn test_list_functions() {
         setup();
 
         // 注册多个代理
@@ -875,7 +1103,7 @@ mod tests {
             ids.push(id);
             let code = random_code();
             let info = create_agent_info(format!("handle_{}", i), None);
-            let _ = agent::register(id, challenger, info, None, code, now_ms + i).await;
+            let _ = agent::register(id, challenger, info, None, code, now_ms + i);
         }
 
         // 测试列表功能
@@ -895,8 +1123,7 @@ mod tests {
                 let new_code = random_code();
                 let info = create_agent_info(format!("handle_{}_updated", i), None);
                 let new_now_ms = now_ms + 1000 + i as u64;
-                let _ =
-                    agent::challenge(*id, challenger, info, None, code, new_code, new_now_ms).await;
+                let _ = agent::challenge(*id, challenger, info, None, code, new_code, new_now_ms);
             }
         }
 

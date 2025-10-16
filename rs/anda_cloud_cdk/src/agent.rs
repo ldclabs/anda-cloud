@@ -1,10 +1,9 @@
 use candid::{CandidType, Principal};
-use core::fmt::Display;
 use ic_auth_types::{ByteArrayB64, canonical_cbor_into_vec};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::HashSet;
 
-use crate::{PaymentProtocol, RegistryError, SignedEnvelope, TEEInfo, sha3_256};
+use crate::{RegistryError, SignedEnvelope, TEEInfo, sha3_256};
 
 pub const ZERO_CHALLENGE_CODE: ByteArrayB64<16> = ByteArrayB64([0u8; 16]);
 
@@ -62,7 +61,7 @@ pub struct Agent {
 ///
 /// This structure holds the metadata and configuration details that define
 /// an agent's capabilities, endpoints, and supported protocols.
-#[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, CandidType, Deserialize, Serialize)]
 pub struct AgentInfo {
     /// Unique account identifier of the agent.
     pub handle: String,
@@ -74,6 +73,10 @@ pub struct AgentInfo {
     /// (e.g. "Anda ICP")
     pub name: String,
 
+    /// A URL to an image representing the agent, such as a logo or avatar.
+    /// (e.g. "https://DOMAIN/path/to/image.png")
+    pub image: String,
+
     /// A human-readable description of the agent. Used to assist users and
     /// other agents in understanding what the agent can do.
     /// (e.g. "Agent that helps users with recipes and cooking.")
@@ -83,15 +86,8 @@ pub struct AgentInfo {
     /// users will use to communicate with the agent.
     pub endpoint: String,
 
-    /// The protocols the agent supports. It is a map of protocol name to
-    /// agent information.
-    /// (e.g. "ANDA" => "https://DOMAIN/.well-known/agents/{agent_id}"，
-    ///       "A2A" => "https://DOMAIN/.well-known/agent.json")
-    pub protocols: BTreeMap<AgentProtocol, String>,
-
-    /// Payment protocols the agent supports.
-    /// (e.g. ["X402"])
-    pub payments: BTreeSet<PaymentProtocol>,
+    /// Communication protocols the agent supports.
+    pub protocols: Vec<AgentProtocol>,
 
     /// Information about the agent's service provider.
     pub provider: Option<AgentProvider>,
@@ -128,26 +124,69 @@ impl AgentInfo {
             return Err("description cannot be longer than 512 bytes".to_string());
         }
 
-        if !self.endpoint.starts_with("https://") {
+        let endpoint = url::Url::parse(&self.endpoint)
+            .map_err(|_| "endpoint is not a valid URL".to_string())?;
+
+        if endpoint.scheme() != "https" {
             return Err("endpoint should start with https://".to_string());
         }
 
-        if url::Url::parse(&self.endpoint).is_err() {
-            return Err("endpoint is not a valid URL".to_string());
-        }
-
-        for (protocol, url) in &self.protocols {
-            if !url.starts_with("https://") {
-                return Err(format!("protocol {protocol:?} should start with https://",));
-            }
-
-            if url::Url::parse(url).is_err() {
-                return Err(format!("protocol {protocol:?} is not a valid URL"));
+        let mut names = HashSet::new();
+        for protocol in &self.protocols {
+            protocol.validate()?;
+            if !names.insert(protocol.name.clone()) {
+                return Err(format!("duplicate protocol name: {}", protocol.name));
             }
         }
 
         if let Some(provider) = &self.provider {
             provider.validate()?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Information about the agent's communication protocol.
+#[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
+pub struct AgentProtocol {
+    /// The name of the agent protocol. Should be uppercase.
+    /// (e.g. "A2A", "MCP", "X402")
+    pub name: String,
+    /// A URI for the agent protocol's endpoint.
+    /// (e.g. "https://DOMAIN/.well-known/agent.json")
+    pub endpoint: String,
+    /// The version of the agent protocol.
+    /// (e.g. "v1")
+    pub version: Option<String>,
+}
+
+impl AgentProtocol {
+    /// Validates the agent protocol information to ensure it meets system requirements.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.is_empty() {
+            return Err("protocol name is required".to_string());
+        }
+
+        if self.name.trim().to_ascii_uppercase() != self.name {
+            return Err("protocol name must be uppercase".to_string());
+        }
+
+        if self.name.len() > 12 {
+            return Err("protocol name cannot be longer than 12 bytes".to_string());
+        }
+
+        if self.endpoint.is_empty() {
+            return Err("protocol endpoint is required".to_string());
+        }
+
+        let endpoint = self.endpoint.to_ascii_lowercase();
+        if endpoint.starts_with("http") {
+            let u = url::Url::parse(&self.endpoint)
+                .map_err(|_| "protocol endpoint is not a valid URL".to_string())?;
+            if u.scheme() != "https" {
+                return Err("protocol endpoint must use https scheme".to_string());
+            }
         }
 
         Ok(())
@@ -182,15 +221,15 @@ impl AgentProvider {
             return Err("provider name cannot be longer than 32 bytes".to_string());
         }
 
-        if !self.logo.starts_with("https://") {
+        let logo = url::Url::parse(&self.logo)
+            .map_err(|_| "provider logo is not a valid URL".to_string())?;
+        if logo.scheme() != "https" {
             return Err("provider logo should start with https://".to_string());
         }
 
-        if url::Url::parse(&self.logo).is_err() {
-            return Err("provider logo is not a valid URL".to_string());
-        }
-
-        if !self.url.starts_with("https://") {
+        let u = url::Url::parse(&self.url)
+            .map_err(|_| "provider url is not a valid URL".to_string())?;
+        if u.scheme() != "https" {
             return Err("provider url should start with https://".to_string());
         }
 
@@ -391,45 +430,6 @@ impl ChallengeEnvelope {
     }
 }
 
-/// Defines the supported agent communication protocols.
-///
-/// These protocols determine how agents can interact with each other
-/// and with the Anda Cloud system.
-#[derive(
-    Clone, Debug, CandidType, Deserialize, Serialize, Eq, PartialEq, Hash, Ord, PartialOrd,
-)]
-pub enum AgentProtocol {
-    /// Autonomous Networked Decentralized Agent protocol, https://github.com/ldclabs/anda
-    ANDA,
-    /// Agent2Agent protocol, https://github.com/google/A2A
-    A2A,
-    /// Model Context Protocol, https://github.com/modelcontextprotocol
-    MCP,
-}
-
-impl Display for AgentProtocol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AgentProtocol::ANDA => write!(f, "ANDA"),
-            AgentProtocol::A2A => write!(f, "A2A"),
-            AgentProtocol::MCP => write!(f, "MCP"),
-        }
-    }
-}
-
-impl TryFrom<&str> for AgentProtocol {
-    type Error = String;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        match s.to_uppercase().as_str() {
-            "ANDA" => Ok(AgentProtocol::ANDA),
-            "A2A" => Ok(AgentProtocol::A2A),
-            "MCP" => Ok(AgentProtocol::MCP),
-            _ => Err(format!("Unknown AgentProtocol: {}", s)),
-        }
-    }
-}
-
 pub static AGENT_EVENT_API: &str = "on_agent_event";
 
 /// Represents an event related to an agent's registration or status change.
@@ -458,26 +458,139 @@ pub enum AgentEventKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ciborium::Value;
 
     #[test]
-    fn test_agent_protocol() {
-        let protocols = vec![AgentProtocol::ANDA, AgentProtocol::A2A, AgentProtocol::MCP];
-        let got = serde_json::to_string(&protocols).unwrap();
-        let expected = r#"["ANDA","A2A","MCP"]"#;
-        assert_eq!(got, expected);
+    fn agent_protocol_validate_rejects_lowercase_name() {
+        let protocol = AgentProtocol {
+            name: "mcp".into(),
+            endpoint: "https://agent.example/protocol".into(),
+            version: Some("v1".into()),
+        };
 
-        let got: Vec<AgentProtocol> = serde_json::from_str(&got).unwrap();
-        assert_eq!(got, protocols);
+        assert!(matches!(protocol.validate(), Err(message) if message.contains("uppercase")));
+    }
 
-        let got = Value::serialized(&protocols).unwrap();
-        let expected = Value::Array(vec![
-            Value::Text("ANDA".to_string()),
-            Value::Text("A2A".to_string()),
-            Value::Text("MCP".to_string()),
-        ]);
-        assert_eq!(got, expected);
-        let got: Vec<AgentProtocol> = Value::deserialized(&expected).unwrap();
-        assert_eq!(got, protocols);
+    #[test]
+    fn agent_info_validate_accepts_valid_configuration() {
+        let info = sample_agent_info();
+
+        assert!(info.validate().is_ok());
+    }
+
+    #[test]
+    fn agent_info_validate_detects_duplicate_protocol_names() {
+        let mut info = sample_agent_info();
+        info.protocols.push(AgentProtocol {
+            name: "MCP".into(),
+            endpoint: "https://agent.example/dup".into(),
+            version: Some("v1".into()),
+        });
+
+        assert!(
+            matches!(info.validate(), Err(message) if message.contains("duplicate protocol name"))
+        );
+    }
+
+    #[test]
+    fn agent_provider_validate_rejects_insecure_logo_url() {
+        let provider = AgentProvider {
+            id: sample_principal(3),
+            name: "Anda Labs".into(),
+            logo: "http://example.com/logo.png".into(),
+            url: "https://example.com".into(),
+        };
+
+        assert!(
+            matches!(provider.validate(), Err(message) if message.contains("should start with https"))
+        );
+    }
+
+    #[test]
+    fn validate_handle_enforces_rules() {
+        assert!(validate_handle("agent_1").is_ok());
+        assert!(validate_handle("").is_err());
+        assert!(validate_handle("1agent").is_err());
+        assert!(validate_handle("agent-1").is_err());
+    }
+
+    #[test]
+    fn challenge_request_validate_accepts_recent_requests() {
+        let registry = sample_principal(10);
+        let now_ms = 1_000_000;
+        let request = sample_challenge_request(now_ms - 1_000, registry);
+
+        assert!(request.validate(now_ms, &registry).is_ok());
+    }
+
+    #[test]
+    fn challenge_request_validate_rejects_expired_requests() {
+        let registry = sample_principal(11);
+        let now_ms = 2_000_000;
+        let created_at = now_ms - CHALLENGE_EXPIRES_IN_MS - PERMITTED_DRIFT_MS - 1;
+        let request = sample_challenge_request(created_at, registry);
+
+        assert!(
+            matches!(request.validate(now_ms, &registry), Err(message) if message.contains("too old"))
+        );
+    }
+
+    #[test]
+    fn challenge_request_validate_rejects_future_requests() {
+        let registry = sample_principal(12);
+        let now_ms = 3_000_000;
+        let created_at = now_ms + PERMITTED_DRIFT_MS + 1;
+        let request = sample_challenge_request(created_at, registry);
+
+        assert!(
+            matches!(request.validate(now_ms, &registry), Err(message) if message.contains("in the future"))
+        );
+    }
+
+    #[test]
+    fn challenge_request_validate_rejects_wrong_registry() {
+        let registry = sample_principal(13);
+        let wrong_registry = sample_principal(14);
+        let now_ms = 4_000_000;
+        let request = sample_challenge_request(now_ms, wrong_registry);
+
+        assert!(
+            matches!(request.validate(now_ms, &registry), Err(message) if message.contains("different registry"))
+        );
+    }
+
+    fn sample_principal(seed: u8) -> Principal {
+        Principal::self_authenticating([seed; 32])
+    }
+
+    fn sample_agent_info() -> AgentInfo {
+        AgentInfo {
+            handle: "agent_one".into(),
+            handle_canister: Some(sample_principal(1)),
+            name: "Agent One".into(),
+            image: "https://agent.example/image.png".into(),
+            description: "Helpful agent".into(),
+            endpoint: "https://agent.example/api".into(),
+            protocols: vec![AgentProtocol {
+                name: "MCP".into(),
+                endpoint: "https://agent.example/protocol".into(),
+                version: Some("v1".into()),
+            }],
+            provider: Some(AgentProvider {
+                id: sample_principal(2),
+                name: "Anda Labs".into(),
+                logo: "https://example.com/logo.png".into(),
+                url: "https://example.com".into(),
+            }),
+        }
+    }
+
+    fn sample_challenge_request(created_at: u64, registry: Principal) -> ChallengeRequest {
+        ChallengeRequest {
+            registry,
+            code: ByteArrayB64([1u8; 16]),
+            agent: sample_agent_info(),
+            created_at,
+            authentication: None,
+        }
     }
 }
