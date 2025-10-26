@@ -8,5 +8,9 @@
   },
   "anda_registry_canister": {
     "ic": "lfcwh-piaaa-aaaap-an2fa-cai"
+  },
+  "anda_x402_canister": {
+    "ic": "ogkpr-lyaaa-aaaap-an5fq-cai",
+    "local": "ogkpr-lyaaa-aaaap-an5fq-cai"
   }
 }

@@ -6,6 +6,7 @@
     { href: '#project-anda', label: 'Anda' },
     { href: '#project-andadb', label: 'Anda DB' },
     { href: '#project-andacloud', label: 'Anda Cloud' },
+    { href: '#project-x402', label: 'X402' },
     { href: '#about', label: 'About' }
   ]
 

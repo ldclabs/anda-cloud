@@ -72,10 +72,10 @@
           <span>Source Code</span><span><ArrowRightLine /></span>
         </a>
         <a
-          href="#get-started"
+          href="#project-x402"
           class="flex h-12 items-center gap-1 rounded-full border border-black/10 bg-white/10 px-8 font-medium backdrop-blur hover:bg-white/20"
         >
-          <span>Get Started</span><span><ArrowDownLine /></span>
+          <span>Payment Layer</span><span><ArrowDownLine /></span>
         </a>
       </div>
     </div>

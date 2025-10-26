@@ -11,6 +11,7 @@
   import AndaSection from '$lib/components/projects/AndaSection.svelte'
   import KIPSection from '$lib/components/projects/KIPSection.svelte'
   import SectionHeading from '$lib/components/SectionHeading.svelte'
+  import X402Section from '$lib/components/projects/X402Section.svelte'
 </script>
 
 <NavBar />
@@ -109,6 +110,7 @@
   <KIPSection />
   <AndaDBSection />
   <AndaCloudSection />
+  <X402Section />
   <CTASection />
 </main>
 <Footer />

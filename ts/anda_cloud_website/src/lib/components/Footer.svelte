@@ -88,10 +88,20 @@
         <li
           ><a
             class="flex items-center gap-1 hover:text-white"
-            href="https://dmsg.net/PANDA"
+            href="https://dmsg.net"
             target="_blank"
           >
             <span>dMsg.net</span>
+            <span class="*:size-4"><ArrowRightUpLine /></span>
+          </a>
+        </li>
+        <li
+          ><a
+            class="flex items-center gap-1 hover:text-white"
+            href="https://1bridge.app"
+            target="_blank"
+          >
+            <span>One Bridge</span>
             <span class="*:size-4"><ArrowRightUpLine /></span>
           </a>
         </li>

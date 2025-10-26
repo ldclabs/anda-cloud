@@ -15,17 +15,21 @@ A fully on-chain x402 payment facilitator on the Internet Computer, part of [And
 - Supports both JSON and CBOR content types for the HTTP API.
 - Fully deployed as a smart contract on the decentralized ICP blockchain, governed by ICPanda DAO.
 
+## Demo
+
+Try it online: https://ogkpr-lyaaa-aaaap-an5fq-cai.icp0.io/supported
+
 ## Quick Start
 
 ### Local Deployment
 
 Deploy the canister:
 ```bash
-# dfx canister create --specified-id <YOUR_CANISTER_ID> anda_x402_canister
+# dfx canister create --specified-id ogkpr-lyaaa-aaaap-an5fq-cai anda_x402_canister
 dfx deploy anda_x402_canister --argument "(opt variant {Init =
   record {
-    name = \"My X402 Facilitator\";
-    governance_canister = null;
+    name = \"Anda X402 Facilitator\";
+    governance_canister = opt principal \"dwv6s-6aaaa-aaaaq-aacta-cai\";
   }
 })"
 ```
@@ -83,6 +87,36 @@ The HTTP API supports both JSON and CBOR formats. The content type is determined
 - For CBOR: `application/cbor`
 
 ## Data Types
+
+### ICP Payload
+
+The core data structure representing the payment payload for ICP chain:
+
+```rust
+pub struct IcpPayload {
+    /// ICP based signature over the authorization data
+    pub signature: ByteBufB64,
+    /// Authorization parameters for the payment
+    pub authorization: IcpPayloadAuthorization,
+}
+
+pub struct IcpPayloadAuthorization {
+    /// Payment scheme identifier
+    pub scheme: Scheme,
+    /// token ledger canister address
+    pub asset: Principal,
+    /// Recipient's wallet address
+    pub to: Principal,
+    /// Payment amount in atomic units.
+    /// For `exact` scheme, this is the exact amount to be transferred.
+    /// For `upto` scheme, this is the maximum amount that can be transferred.
+    pub value: TokenAmount,
+    /// Unix timestamp when authorization expires (in milliseconds)
+    pub expires_at: u64,
+    /// A self-incrementing number and should be used to prevent replay attacks.
+    pub nonce: u64,
+}
+```
 
 ### State
 
