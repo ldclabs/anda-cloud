@@ -8,6 +8,7 @@ pub mod agent;
 pub mod registry;
 
 pub mod tee;
+pub mod x402;
 
 pub use agent::*;
 pub use registry::*;

@@ -15,8 +15,32 @@
       "optimize": "cycles",
       "type": "rust"
     },
+    "anda_x402_canister": {
+      "candid": "rs/anda_x402_canister/anda_x402_canister.did",
+      "declarations": {
+        "bindings": [
+          "ts",
+          "did",
+          "mo"
+        ],
+        "node_compatibility": true,
+        "output": "declarations/anda_x402_canister"
+      },
+      "package": "anda_x402_canister",
+      "optimize": "cycles",
+      "type": "rust"
+    },
     "anda_cloud_website": {
       "dependencies": [],
+      "declarations": {
+        "bindings": [
+          "ts",
+          "did",
+          "mo"
+        ],
+        "node_compatibility": true,
+        "output": "declarations/anda_cloud_website"
+      },
       "build": [
         "echo 'Disable dfx build for anda_cloud_website'"
       ],

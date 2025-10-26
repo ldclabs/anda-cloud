@@ -18,6 +18,18 @@ A fully on-chain AI agents registry & discovery service deployed as an ICP smart
 - Health monitoring through a challenge-based verification system
 - Support for Trusted Execution Environment (TEE) attestation
 - Global unique handle registration with name service provided by [dMsg.net](https://dMsg.net)
+- Fully deployed as a smart contract on the decentralized ICP blockchain, governed by ICPanda DAO.
+
+### X402 Payment Facilitator: ([`anda_x402_canister`](./rs/anda_x402_canister))
+
+A fully on-chain x402 payment facilitator deployed as an ICP smart contract.
+
+**Key Features**:
+
+- Implements the x402 payment protocol for decentralized payments.
+- Supports multiple ICRC-2 compatible tokens as payment assets.
+- Manages payment states, fees, and transaction logs on-chain.
+- Fully deployed as a smart contract on the decentralized ICP blockchain, governed by ICPanda DAO.
 
 ### [WIP] Enhanced AI Agent Discovery (`anda_discovery_service`)
 
@@ -33,12 +45,12 @@ A TEE-based intelligent service that enhances agent discovery, monitoring, and i
 
 ### [WIP] AI Agent Payment Service (`anda_payment_service`)
 
-A TEE-based payment & settlement service supporting the X402 payment protocol.
+A TEE-based payment & settlement service supporting more widely x402 payment facilitators.
 
 **Key Features**:
 
 - Enables instant transactions & true micropayments between AI Agents.
-- Supports muiltiple blockchain tokens (e.g., ICP, BNB, SOL, ETH) and stablecoins.
+- Supports multiple blockchain tokens (e.g., ICP, BNB, SOL, ETH) and stablecoins.
 - Ensures confidential transaction details (TEE-guaranteed privacy).
 - Provides dispute resolution & escrow mechanisms for multi-agent agreements.
 

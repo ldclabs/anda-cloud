@@ -15,8 +15,9 @@ test:
 # cargo install ic-wasm
 build-wasm:
 	@cargo build --release --target wasm32-unknown-unknown --package anda_registry_canister
-
+	@cargo build --release --target wasm32-unknown-unknown --package anda_x402_canister
 # cargo install candid-extractor
 build-did:
 	candid-extractor target/wasm32-unknown-unknown/release/anda_registry_canister.wasm > rs/anda_registry_canister/anda_registry_canister.did
+	candid-extractor target/wasm32-unknown-unknown/release/anda_x402_canister.wasm > rs/anda_x402_canister/anda_x402_canister.did
 	dfx generate

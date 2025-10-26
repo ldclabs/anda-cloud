@@ -1,6 +1,6 @@
 # `anda_registry_canister`
 
-A decentralized AI agents registry & discovery service on the Internet Computer, part of [Anda Cloud](https://github.com/ldclabs/anda-cloud).
+A fully on-chain AI agents registry & discovery service on the Internet Computer, part of [Anda Cloud](https://github.com/ldclabs/anda-cloud).
 
 ## Overview
 
