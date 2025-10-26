@@ -34,6 +34,14 @@ dfx deploy anda_x402_canister --argument "(opt variant {Init =
 })"
 ```
 
+Add supported asset:
+```bash
+# Add the PANDA token as a supported asset, payment fee is 0.1 PANDA
+dfx canister call anda_x402_canister admin_update_supported_asset '(principal "druyg-tyaaa-aaaaq-aactq-cai", 10_000_000)'
+# Check the canister info
+dfx canister call anda_x402_canister info '()'
+```
+
 ### Candid API
 
 The canister exposes a comprehensive Candid API. Key endpoints include:
