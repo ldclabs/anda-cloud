@@ -87,7 +87,7 @@ type Result_7 = variant { Ok : text; Err : text };
 type SignedDelegationCompact = record { d : DelegationCompact; s : blob };
 type SignedEnvelope = record {
   d : opt vec SignedDelegationCompact;
-  h : blob;
+  h : opt blob;
   p : blob;
   s : blob;
 };

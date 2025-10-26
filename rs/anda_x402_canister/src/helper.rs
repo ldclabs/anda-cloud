@@ -13,7 +13,6 @@ use icrc_ledger_types::{
     },
 };
 use num_traits::cast::ToPrimitive;
-use std::collections::BTreeSet;
 
 use crate::store;
 
@@ -29,45 +28,6 @@ pub fn check_auth(user: &Principal) -> Result<(), String> {
         Err("anonymous user is not allowed".to_string())
     } else {
         Ok(())
-    }
-}
-
-pub fn validate_principals(principals: &BTreeSet<Principal>) -> Result<(), String> {
-    if principals.is_empty() {
-        return Err("principals cannot be empty".to_string());
-    }
-    if principals.contains(&ANONYMOUS) {
-        return Err("anonymous user is not allowed".to_string());
-    }
-    Ok(())
-}
-
-pub fn format_error<T>(err: T) -> String
-where
-    T: std::fmt::Debug,
-{
-    format!("{:?}", err)
-}
-
-pub fn convert_amount(
-    src_amount: u128,
-    src_decimals: u8,
-    target_decimals: u8,
-) -> Result<u128, String> {
-    if src_decimals == target_decimals {
-        Ok(src_amount)
-    } else if src_decimals < target_decimals {
-        let factor = 10u128
-            .checked_pow((target_decimals - src_decimals) as u32)
-            .ok_or_else(|| "exponent too large".to_string())?;
-        src_amount
-            .checked_mul(factor)
-            .ok_or_else(|| "multiplication overflow".to_string())
-    } else {
-        let factor = 10u128
-            .checked_pow((src_decimals - target_decimals) as u32)
-            .ok_or_else(|| "exponent too large".to_string())?;
-        Ok(src_amount / factor)
     }
 }
 

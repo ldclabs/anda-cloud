@@ -262,25 +262,24 @@ impl X402Request {
                 self.payment_payload
                     .payload
                     .authorization
-                    .scheme
-                    .to_string(),
-                self.payment_payload.scheme.to_string(),
+                    .scheme,
+                self.payment_payload.scheme,
             )));
         }
 
         if self.payment_payload.payload.authorization.asset != self.payment_requirements.asset {
             return Err(X402Error::InvalidPayloadAuthorizationValidAsset(format!(
                 "mismatched asset in payload authorization: {}, expected: {}",
-                self.payment_payload.payload.authorization.asset.to_string(),
-                self.payment_requirements.asset.to_string(),
+                self.payment_payload.payload.authorization.asset,
+                self.payment_requirements.asset,
             )));
         }
 
         if self.payment_payload.payload.authorization.to != self.payment_requirements.pay_to {
             return Err(X402Error::InvalidPayloadRecipientMismatch(format!(
                 "{}, expected: {}",
-                self.payment_payload.payload.authorization.to.to_string(),
-                self.payment_requirements.pay_to.to_string(),
+                self.payment_payload.payload.authorization.to,
+                self.payment_requirements.pay_to,
             )));
         }
 

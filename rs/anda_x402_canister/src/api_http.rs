@@ -89,7 +89,7 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
         ("HEAD", _) => Ok(Vec::new()),
         ("GET", "/") => get_info(in_cbor),
         ("GET", "/supported") => get_supported(in_cbor),
-        ("POST", "/verify") => post_verify(&request.body(), in_cbor).await,
+        ("POST", "/verify") => post_verify(request.body(), in_cbor).await,
         (method, path) => Err(HttpError {
             status_code: 404,
             message: format!("method {method}, path: {path}"),
@@ -143,7 +143,7 @@ async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpRespons
     let in_cbor = supports_cbor(request.headers());
 
     let rt = match (request.method().as_str(), req_path.as_str()) {
-        ("POST", "/settle") => post_settle(&request.body(), in_cbor).await,
+        ("POST", "/settle") => post_settle(request.body(), in_cbor).await,
         (method, path) => Err(HttpError {
             status_code: 404,
             message: format!("method {method}, path: {path}"),
@@ -284,7 +284,7 @@ async fn post_settle(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
 
 fn decode_payment(body: &[u8], in_cbor: bool) -> Result<X402Request, X402Error> {
     let req: X402Request = if in_cbor {
-        from_reader(&body[..])
+        from_reader(body)
             .map_err(|err| X402Error::InvalidPayload(format!("failed to decode cbor: {err}")))?
     } else {
         serde_json::from_slice(body)

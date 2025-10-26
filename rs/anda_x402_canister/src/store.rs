@@ -20,7 +20,7 @@ use std::{
 
 use crate::helper::{token_allowance, transfer_token_from};
 
-const CLOCK_SKEW_MS: u64 = 1000 * 60 * 1; // 1 minute
+const CLOCK_SKEW_MS: u64 = 1000 * 60; // 1 minute
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -190,7 +190,6 @@ thread_local! {
 
 pub mod state {
     use super::*;
-    use crate::helper::call;
     use lazy_static::lazy_static;
     use once_cell::sync::Lazy;
 
@@ -211,10 +210,6 @@ pub mod state {
 
     pub fn with_mut<R>(f: impl FnOnce(&mut State) -> R) -> R {
         STATE.with_borrow_mut(f)
-    }
-
-    pub fn is_controller(caller: &Principal) -> bool {
-        STATE.with_borrow(|s| s.governance_canister.as_ref() == Some(caller))
     }
 
     pub fn http_tree_with<R>(f: impl FnOnce(&HttpCertificationTree) -> R) -> R {
@@ -392,7 +387,7 @@ pub mod state {
             )));
         }
 
-        if res.allowance < Nat::from(amount) {
+        if res.allowance < amount {
             return Err(X402Error::InsufficientFunds(format!(
                 "{}, required: {}",
                 res.allowance, amount

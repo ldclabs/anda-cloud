@@ -81,7 +81,7 @@ module {
   public type SignedDelegationCompact = { d : DelegationCompact; s : Blob };
   public type SignedEnvelope = {
     d : ?[SignedDelegationCompact];
-    h : Blob;
+    h : ?Blob;
     p : Blob;
     s : Blob;
   };

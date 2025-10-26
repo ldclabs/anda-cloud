@@ -99,7 +99,7 @@ export interface SignedDelegationCompact {
 }
 export interface SignedEnvelope {
   'd' : [] | [Array<SignedDelegationCompact>],
-  'h' : Uint8Array | number[],
+  'h' : [] | [Uint8Array | number[]],
   'p' : Uint8Array | number[],
   's' : Uint8Array | number[],
 }
