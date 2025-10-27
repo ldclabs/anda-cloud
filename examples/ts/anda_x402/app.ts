@@ -74,7 +74,7 @@ async function main() {
   console.log('\n\nSettle Response:', settleJson)
   // Settle Response: {
   //   success: true,
-  //   transaction: 'druyg-tyaaa-aaaaq-aactq-cai:23',
+  //   transaction: '3:druyg-tyaaa-aaaaq-aactq-cai:30',
   //   network: 'icp-ogkpr-lyaaa-aaaap-an5fq-cai',
   //   payer: 'jjn6g-sh75l-r3cxb-wxrkl-frqld-6p6qq-d4ato-wske5-op7s5-n566f-bqe'
   // }

@@ -74,8 +74,6 @@ export class X402Canister {
 
   async signPayload(data: IcpPayloadAuthorization): Promise<string> {
     const sig = await signCborMessage(this.#identity, data)
-    console.log('Signature:', Buffer.from(sig.h!).toString('hex'))
-    console.log('Signed data:', data)
     delete sig.h
     return bytesToBase64Url(deterministicEncode(sig))
   }
