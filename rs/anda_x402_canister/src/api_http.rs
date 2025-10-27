@@ -351,18 +351,16 @@ async fn settle_payment(
         from: payer,
         to: req.payment_requirements.pay_to,
         value: req.payment_payload.payload.authorization.value.0,
-        fee: asset_info
-            .payment_fee
-            .saturating_sub(asset_info.transfer_fee),
+        fee: asset_info.payment_fee,
         expires_at: req.payment_payload.payload.authorization.expires_at,
         nonce: req.payment_payload.payload.authorization.nonce,
         timestamp: now_ms,
     };
 
-    let idx = store::state::transfer_funds(canister_self, log)
+    let tx = store::state::transfer_funds(canister_self, log, asset_info.transfer_fee)
         .await
         .map_err(|err| (err, Some(payer)))?;
-    Ok((payer, format!("{}:{}", req.payment_requirements.asset, idx)))
+    Ok((payer, tx))
 }
 
 fn supports_cbor(headers: &[HeaderField]) -> bool {

@@ -107,10 +107,13 @@ export function toNetwork(principal: Principal): string {
   return `icp-${principal.toText()}`
 }
 
-export function parseTransaction(transaction: string): [Principal, bigint] {
+/// Parses a transaction string in the format "log_id:asset_canister:block_idx"
+export function parseTransaction(
+  transaction: string
+): [bigint, Principal, bigint] {
   const parts = transaction.split(':')
-  if (parts.length === 2) {
-    return [Principal.fromText(parts[0]), BigInt(parts[1])]
+  if (parts.length === 3) {
+    return [BigInt(parts[0]), Principal.fromText(parts[1]), BigInt(parts[2])]
   }
 
   throw new Error(`Unsupported transaction format: ${transaction}`)

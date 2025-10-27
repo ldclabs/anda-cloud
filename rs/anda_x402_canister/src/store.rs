@@ -1,5 +1,5 @@
 use anda_cloud_cdk::x402::*;
-use candid::{CandidType, Nat, Principal};
+use candid::{CandidType, Principal};
 use ciborium::{from_reader, into_writer};
 use ic_http_certification::{
     HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpCertificationTreeEntry,
@@ -401,7 +401,8 @@ pub mod state {
     pub async fn transfer_funds(
         canister_self: Principal,
         log: PaymentLog,
-    ) -> Result<Nat, X402Error> {
+        transfer_fee: u128,
+    ) -> Result<String, X402Error> {
         let idx = transfer_token_from(
             log.asset,
             log.from,
@@ -418,6 +419,7 @@ pub mod state {
             .with_borrow_mut(|r| r.append(&log))
             .expect("failed to append to LOGS");
 
+        let tx = format!("{log_id}:{}:{idx}", log.asset);
         PAYER_STATE.with_borrow_mut(|r| {
             let mut s = r.get(&log.from).unwrap_or_default();
             s.next_nonce = s.next_nonce.saturating_add(1);
@@ -425,8 +427,7 @@ pub mod state {
             *total_sent = total_sent.saturating_add(log.value);
             s.logs.insert(log_id);
             r.insert(log.from, s);
-            Ok(())
-        })?;
+        });
 
         if log.fee > 0 {
             // run in background
@@ -434,28 +435,23 @@ pub mod state {
                 let asset = log.asset;
                 let payer = log.from;
                 let canister_self = canister_self;
-                let payment_fee = log.fee;
+                let fee = log.fee.saturating_sub(transfer_fee);
                 let nonce = log.nonce;
                 ic_cdk::futures::spawn(async move {
-                    let res = transfer_token_from(
-                        asset,
-                        payer,
-                        canister_self,
-                        payment_fee,
-                        Some(nonce.into()),
-                    )
-                    .await;
+                    let res =
+                        transfer_token_from(asset, payer, canister_self, fee, Some(nonce.into()))
+                            .await;
 
                     if res.is_ok() {
                         STATE.with_borrow_mut(|state| {
                             let total = state.total_collected_fees.entry(asset).or_insert(0);
-                            *total = total.saturating_add(payment_fee);
+                            *total = total.saturating_add(fee);
                         });
                     }
                 });
             });
         }
 
-        Ok(idx)
+        Ok(tx)
     }
 }

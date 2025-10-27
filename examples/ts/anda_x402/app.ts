@@ -81,6 +81,10 @@ async function main() {
 
   const after = await x402.getBalanceOf(assetId, payTo)
   console.log('Balance:', before, '->', after)
+
+  // Client: list my payment logs
+  const logs = await x402.listMyPaymentLogs(3)
+  console.log('\n\nMy Payment Logs:', logs)
 }
 
 main().catch((error) => {
