@@ -15,21 +15,39 @@ A fully on-chain x402 payment facilitator on the Internet Computer, part of [And
 - Supports both JSON and CBOR content types for the HTTP API.
 - Fully deployed as a smart contract on the decentralized ICP blockchain, governed by ICPanda DAO.
 
-## Client Typescript SDK
+## Online Anda x402 Facilitator Endpoints
 
-npmjs: https://www.npmjs.com/package/@ldclabs/anda_x402
+Facilitator Info:
+https://ogkpr-lyaaa-aaaap-an5fq-cai.icp0.io
+
+Supported Payment Kinds:
+https://ogkpr-lyaaa-aaaap-an5fq-cai.icp0.io/supported
+
+Verify:
+```
+POST https://ogkpr-lyaaa-aaaap-an5fq-cai.icp0.io/verify
+```
+
+Settle:
+```
+POST https://ogkpr-lyaaa-aaaap-an5fq-cai.icp0.io/settle
+```
+
+## Quick Start
+
+### Client Typescript SDK
 
 ```bash
 npm install @ldclabs/anda_x402
 ```
 
+npmjs: https://www.npmjs.com/package/@ldclabs/anda_x402
+
 source: https://github.com/ldclabs/anda-cloud/tree/main/ts/anda_x402
 
-## Client Example
+### Integration Example
 
-https://github.com/ldclabs/anda-cloud/tree/main/examples/ts/anda_x402
-
-## Quick Start
+https://github.com/ldclabs/anda-cloud/tree/main/examples/ts/anda_x402/app.ts
 
 ### Local Deployment
 
@@ -106,79 +124,33 @@ The HTTP API supports both JSON and CBOR formats. The content type is determined
 
 ## Data Types
 
-### ICP Payload
+### ICP Payment Payload
 
 The core data structure representing the payment payload for ICP chain:
 
-```rust
-pub struct IcpPayload {
-    /// ICP based signature over the authorization data
-    pub signature: ByteBufB64,
-    /// Authorization parameters for the payment
-    pub authorization: IcpPayloadAuthorization,
+```ts
+export interface IcpPayload {
+  /// ICP based signature over the authorization data in base64 format
+  signature: string
+  /// Authorization parameters for the payment
+  authorization: IcpPayloadAuthorization
 }
 
-pub struct IcpPayloadAuthorization {
-    /// Payment scheme identifier
-    pub scheme: Scheme,
-    /// token ledger canister address
-    pub asset: Principal,
-    /// Recipient's wallet address
-    pub to: Principal,
-    /// Payment amount in atomic units.
-    /// For `exact` scheme, this is the exact amount to be transferred.
-    /// For `upto` scheme, this is the maximum amount that can be transferred.
-    pub value: TokenAmount,
-    /// Unix timestamp when authorization expires (in milliseconds)
-    pub expires_at: u64,
-    /// A self-incrementing number and should be used to prevent replay attacks.
-    pub nonce: u64,
-}
-```
-
-### State
-
-The core data structure representing the canister's state:
-
-```rust
-pub struct State {
-    pub name: String,
-    pub governance_canister: Option<Principal>,
-    pub supported_payments: BTreeSet<SupportedPaymentKind>,
-    pub supported_assets: BTreeMap<Principal, AssetInfo>,
-    pub total_collected_fees: BTreeMap<Principal, u128>,
-    pub total_withdrawn_fees: BTreeMap<Principal, u128>,
-}
-```
-
-### PaymentLogInfo
-
-Contains information about a settled payment:
-
-```rust
-pub struct PaymentLogInfo {
-    pub id: u64,
-    pub to: Principal,
-    pub fee: String,
-    pub asset: Principal,
-    pub value: String,
-    pub scheme: Scheme,
-    pub from: Principal,
-    pub nonce: u64,
-    pub timestamp: u64,
-    pub expires_at: u64,
-}
-```
-
-### SupportedPaymentKind
-
-Defines a supported payment method:
-
-```rust
-pub struct SupportedPaymentKind {
-    pub x402_version: X402Version,
-    pub scheme: Scheme,
-    pub network: String,
+export interface IcpPayloadAuthorization {
+  /// Payment scheme identifier
+  scheme: 'exact' | 'upto'
+  /// token ledger canister address
+  asset: string
+  /// Recipient's wallet address
+  to: string
+  /// Payment amount in atomic units.
+  /// For `exact` scheme, this is the exact amount to be transferred.
+  /// For `upto` scheme, this is the maximum amount that can be transferred.
+  value: string
+  /// Unix timestamp when authorization expires (in milliseconds)
+  expiresAt: number
+  /// A self-incrementing number and should be used to prevent replay attacks.
+  nonce: number
 }
 ```
 

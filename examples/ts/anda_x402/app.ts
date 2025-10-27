@@ -17,6 +17,10 @@ async function main() {
   const info = await x402.getInfo()
   console.log('Info:', info)
 
+  const payTo = 'rrkah-fqaaa-aaaaa-aaaaq-cai'
+  const before = await x402.getBalanceOf(assetId, payTo)
+  console.log('Balance:', before)
+
   const req: PaymentRequirementsResponse = {
     x402Version: 1,
     error: 'some error',
@@ -26,7 +30,7 @@ async function main() {
         network: x402.network,
         maxAmountRequired: '100000000', // 1 PANDA
         asset: assetId,
-        payTo: 'rrkah-fqaaa-aaaaa-aaaaq-cai',
+        payTo,
         resource: 'https://github.com/ldclabs',
         description: 'Payment for some resource',
         maxTimeoutSeconds: 300
@@ -74,6 +78,9 @@ async function main() {
   //   network: 'icp-ogkpr-lyaaa-aaaap-an5fq-cai',
   //   payer: 'jjn6g-sh75l-r3cxb-wxrkl-frqld-6p6qq-d4ato-wske5-op7s5-n566f-bqe'
   // }
+
+  const after = await x402.getBalanceOf(assetId, payTo)
+  console.log('Balance:', before, '->', after)
 }
 
 main().catch((error) => {
