@@ -29,12 +29,7 @@ static IC_CERTIFICATE_EXPRESSION_HEADER: &str = "ic-certificateexpression";
 
 #[ic_cdk::query(hidden = true)]
 async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
-    let req_path = request.get_path();
-
-    if request.method().as_str() == "POST"
-        && let Ok(path) = &req_path
-        && path != "/verify"
-    {
+    if request.method().as_str() == "POST" {
         return HttpResponse {
             status_code: 200,
             headers: vec![],
@@ -70,7 +65,7 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
         ),
     ];
 
-    let req_path = match req_path {
+    let req_path = match request.get_path() {
         Ok(path) => path,
         Err(err) => {
             headers.push(("content-type".to_string(), "text/plain".to_string()));
@@ -89,7 +84,6 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
         ("HEAD", _) => Ok(Vec::new()),
         ("GET", "/") => get_info(in_cbor),
         ("GET", "/supported") => get_supported(in_cbor),
-        ("POST", "/verify") => post_verify(request.body(), in_cbor).await,
         (method, path) => Err(HttpError {
             status_code: 404,
             message: format!("method {method}, path: {path}"),
@@ -143,6 +137,7 @@ async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpRespons
     let in_cbor = supports_cbor(request.headers());
 
     let rt = match (request.method().as_str(), req_path.as_str()) {
+        ("POST", "/verify") => post_verify(request.body(), in_cbor).await,
         ("POST", "/settle") => post_settle(request.body(), in_cbor).await,
         (method, path) => Err(HttpError {
             status_code: 404,
@@ -367,7 +362,7 @@ async fn settle_payment(
     let idx = store::state::transfer_funds(canister_self, log)
         .await
         .map_err(|err| (err, Some(payer)))?;
-    Ok((payer, idx.to_string()))
+    Ok((payer, format!("{}:{}", req.payment_requirements.asset, idx)))
 }
 
 fn supports_cbor(headers: &[HeaderField]) -> bool {

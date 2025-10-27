@@ -4,6 +4,7 @@
       "candid": "rs/anda_registry_canister/anda_registry_canister.did",
       "declarations": {
         "bindings": [
+          "js",
           "ts",
           "did",
           "mo"
@@ -19,6 +20,7 @@
       "candid": "rs/anda_x402_canister/anda_x402_canister.did",
       "declarations": {
         "bindings": [
+          "js",
           "ts",
           "did",
           "mo"
@@ -34,6 +36,7 @@
       "dependencies": [],
       "declarations": {
         "bindings": [
+          "js",
           "ts",
           "did",
           "mo"

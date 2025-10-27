@@ -37,11 +37,12 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "anda_cloud_cdk"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "candid",
  "ciborium",
- "ic_auth_types",
+ "hex",
+ "ic_auth_types 0.7.0",
  "ic_auth_verifier",
  "serde",
  "serde_json",
@@ -52,7 +53,7 @@ dependencies = [
 
 [[package]]
 name = "anda_registry_canister"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anda_cloud_cdk",
  "base64 0.22.1",
@@ -63,7 +64,7 @@ dependencies = [
  "ic-dummy-getrandom-for-wasm",
  "ic-http-certification",
  "ic-stable-structures 0.7.2",
- "ic_auth_types",
+ "ic_auth_types 0.7.0",
  "ic_auth_verifier",
  "ic_tee_nitro_attestation",
  "lazy_static",
@@ -78,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "anda_x402_canister"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anda_cloud_cdk",
  "base64 0.22.1",
@@ -89,7 +90,7 @@ dependencies = [
  "ic-dummy-getrandom-for-wasm",
  "ic-http-certification",
  "ic-stable-structures 0.7.2",
- "ic_auth_types",
+ "ic_auth_types 0.7.0",
  "icrc-ledger-types",
  "lazy_static",
  "num-traits",
@@ -1523,10 +1524,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "ic_auth_verifier"
-version = "0.6.3"
+name = "ic_auth_types"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b2fdf1e61fc1b9c98d00cb1f6d00e2cdbedfa9854d6f9b954b02b83f9ff3132"
+checksum = "328c4e16e9cbe157ab9d2e09d754295cfcc4086a38b4ffc5249ae6df150271f4"
+dependencies = [
+ "base64 0.22.1",
+ "candid",
+ "ciborium",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "ic_auth_verifier"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66d21ce65db7a5070330f839dc19a700ce91eccec445f8360a9b87e21c659f40"
 dependencies = [
  "arc-swap",
  "base64 0.22.1",
@@ -1538,7 +1552,7 @@ dependencies = [
  "ic-agent",
  "ic-canister-sig-creation",
  "ic-signature-verification",
- "ic_auth_types",
+ "ic_auth_types 0.7.0",
  "k256",
  "p256",
  "rand 0.9.2",
@@ -1586,7 +1600,7 @@ dependencies = [
  "ciborium",
  "coset",
  "hex",
- "ic_auth_types",
+ "ic_auth_types 0.6.3",
  "lazy_static",
  "ring",
  "serde",

@@ -1,0 +1,64 @@
+{
+  "name": "@ldclabs/anda_x402",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Typescript version of the client SDK for the Anda x402.",
+  "license": "MIT",
+  "homepage": "https://github.com/ldclabs/anda-cloud/tree/main/ts/anda_x402",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ldclabs/anda-cloud.git"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "browser": {
+    "node:fs/promises": false,
+    "node:path": false,
+    "mime/lite": false
+  },
+  "files": [
+    "candid",
+    "dist",
+    "package.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "typings": "./dist/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\"",
+    "test": "vitest run",
+    "ncu": "npx npm-check-updates -u"
+  },
+  "dependencies": {
+    "@ldclabs/ic-auth": "^0.1.2"
+  },
+  "peerDependencies": {
+    "@dfinity/agent": ">=3.2.0",
+    "@dfinity/candid": ">=3.2.0",
+    "@dfinity/identity": ">=3.2.0",
+    "@dfinity/principal": ">=3.2.0",
+    "@noble/hashes": ">=1.8.0",
+    "cborg": ">=4.2.0"
+  },
+  "devDependencies": {
+    "@dfinity/agent": ">=3.2.0",
+    "@dfinity/identity": ">=3.2.0",
+    "@dfinity/principal": ">=3.2.0",
+    "@noble/hashes": "^1.8.0",
+    "cborg": ">=4.2.0",
+    "@types/eslint": "^9.6.1",
+    "@types/node": "24.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.42.0",
+    "@typescript-eslint/parser": "^8.42.0",
+    "eslint": "^9.34.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

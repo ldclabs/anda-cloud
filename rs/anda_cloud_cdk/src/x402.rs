@@ -4,7 +4,7 @@
 
 use candid::{CandidType, Principal};
 use ic_auth_types::ByteBufB64;
-use ic_auth_types::canonical_cbor_into_vec;
+use ic_auth_types::deterministic_cbor_into_vec;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt::{self, Debug, Display, Formatter},
@@ -157,7 +157,8 @@ pub struct PaymentRequirements {
     /// Human-readable description of the resource
     pub description: String,
     /// MIME type of the expected response
-    pub mime_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
     /// JSON schema describing the response format
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<serde_json::Value>,
@@ -206,7 +207,7 @@ impl IcpPayload {
 }
 
 /// Authorization parameters for an ICP payment payload
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IcpPayloadAuthorization {
     /// Payment scheme identifier
@@ -227,8 +228,38 @@ pub struct IcpPayloadAuthorization {
 
 impl IcpPayloadAuthorization {
     pub fn digest(&self) -> [u8; 32] {
-        let data =
-            canonical_cbor_into_vec(&self).expect("failed to serialize IcpPayloadAuthorization");
+        IcpPayloadAuthorizationRaw::from(self).digest()
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcpPayloadAuthorizationRaw {
+    pub scheme: String,
+    pub asset: String,
+    pub to: String,
+    pub value: String,
+    pub expires_at: u64,
+    pub nonce: u64,
+}
+
+impl From<&IcpPayloadAuthorization> for IcpPayloadAuthorizationRaw {
+    fn from(auth: &IcpPayloadAuthorization) -> Self {
+        IcpPayloadAuthorizationRaw {
+            scheme: auth.scheme.to_string(),
+            asset: auth.asset.to_text(),
+            to: auth.to.to_text(),
+            value: auth.value.to_string(),
+            expires_at: auth.expires_at,
+            nonce: auth.nonce,
+        }
+    }
+}
+
+impl IcpPayloadAuthorizationRaw {
+    pub fn digest(&self) -> [u8; 32] {
+        let data = deterministic_cbor_into_vec(&self)
+            .expect("failed to serialize IcpPayloadAuthorization");
         sha3_256(&data)
     }
 }
@@ -259,27 +290,21 @@ impl X402Request {
         if self.payment_payload.payload.authorization.scheme != self.payment_payload.scheme {
             return Err(X402Error::InvalidPayload(format!(
                 "mismatched scheme in payload authorization: {}, expected: {}",
-                self.payment_payload
-                    .payload
-                    .authorization
-                    .scheme,
-                self.payment_payload.scheme,
+                self.payment_payload.payload.authorization.scheme, self.payment_payload.scheme,
             )));
         }
 
         if self.payment_payload.payload.authorization.asset != self.payment_requirements.asset {
             return Err(X402Error::InvalidPayloadAuthorizationValidAsset(format!(
                 "mismatched asset in payload authorization: {}, expected: {}",
-                self.payment_payload.payload.authorization.asset,
-                self.payment_requirements.asset,
+                self.payment_payload.payload.authorization.asset, self.payment_requirements.asset,
             )));
         }
 
         if self.payment_payload.payload.authorization.to != self.payment_requirements.pay_to {
             return Err(X402Error::InvalidPayloadRecipientMismatch(format!(
                 "{}, expected: {}",
-                self.payment_payload.payload.authorization.to,
-                self.payment_requirements.pay_to,
+                self.payment_payload.payload.authorization.to, self.payment_requirements.pay_to,
             )));
         }
 
@@ -595,7 +620,7 @@ mod tests {
             pay_to: principal,
             resource: Url::from_str("https://example.com").unwrap(),
             description: "Test resource".to_string(),
-            mime_type: "application/json".to_string(),
+            mime_type: None,
             output_schema: None,
             max_timeout_seconds: 300,
             extra: None,
@@ -619,5 +644,29 @@ mod tests {
         assert!(!invalid_response.is_valid);
         assert_eq!(invalid_response.payer, payer);
         assert_eq!(invalid_response.invalid_reason, Some(reason.to_string()));
+    }
+
+    #[test]
+    fn test_icp_payload_authorization_digest() {
+        let auth = IcpPayloadAuthorization {
+            scheme: Scheme::Exact,
+            asset: Principal::from_text("druyg-tyaaa-aaaaq-aactq-cai").unwrap(),
+            to: Principal::from_text(
+                "77ibd-jp5kr-moeco-kgoar-rro5v-5tng4-krif5-5h2i6-osf2f-2sjtv-kqe",
+            )
+            .unwrap(),
+            value: TokenAmount(100000000),
+            expires_at: 1761536123382,
+            nonce: 42,
+        };
+
+        let data = deterministic_cbor_into_vec(&auth)
+            .expect("failed to serialize IcpPayloadAuthorization");
+        println!("CBOR Data: {}", hex::encode(&data));
+        // a662746f581dfd5458e209ca338118c5ddaf66d37151417bd3e91e748ba2ea499d55026561737365744a00000000020000a70101656e6f6e6365182a6576616c75656931303030303030303066736368656d65656578616374696578706972657341741b0000019a23bc21f6
+
+        let digest = auth.digest();
+        let expected_hex = "152123b3911c3faed77fe0642f36332d495ab97417aeca0c7cae27ab83e517bd"; // Placeholder
+        assert_eq!(hex::encode(digest), expected_hex);
     }
 }

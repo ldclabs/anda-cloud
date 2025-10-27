@@ -85,6 +85,7 @@ pub struct PaymentLog {
 }
 
 #[derive(Clone, CandidType, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PaymentLogInfo {
     pub id: u64,
     pub scheme: Scheme,

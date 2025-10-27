@@ -15,9 +15,19 @@ A fully on-chain x402 payment facilitator on the Internet Computer, part of [And
 - Supports both JSON and CBOR content types for the HTTP API.
 - Fully deployed as a smart contract on the decentralized ICP blockchain, governed by ICPanda DAO.
 
-## Demo
+## Client Typescript SDK
 
-Try it online: https://ogkpr-lyaaa-aaaap-an5fq-cai.icp0.io/supported
+npmjs: https://www.npmjs.com/package/@ldclabs/anda_x402
+
+```bash
+npm install @ldclabs/anda_x402
+```
+
+source: https://github.com/ldclabs/anda-cloud/tree/main/ts/anda_x402
+
+## Client Example
+
+https://github.com/ldclabs/anda-cloud/tree/main/examples/ts/anda_x402
 
 ## Quick Start
 

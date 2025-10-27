@@ -1,5 +1,5 @@
 use candid::{CandidType, Principal};
-use ic_auth_types::{ByteArrayB64, canonical_cbor_into_vec};
+use ic_auth_types::{ByteArrayB64, deterministic_cbor_into_vec};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -311,7 +311,7 @@ impl ChallengeRequest {
     /// # Returns
     /// - A 32-byte array containing the SHA3-256 hash of the serialized data
     pub fn core_digest(&self) -> [u8; 32] {
-        let data = canonical_cbor_into_vec(&ChallengeRequestCoreRef {
+        let data = deterministic_cbor_into_vec(&ChallengeRequestCoreRef {
             registry: &self.registry,
             code: &self.code,
             agent: &self.agent,
@@ -328,7 +328,8 @@ impl ChallengeRequest {
     /// # Returns
     /// - A 32-byte array containing the SHA3-256 hash of the serialized data
     pub fn digest(&self) -> [u8; 32] {
-        let data = canonical_cbor_into_vec(&self).expect("failed to serialize ChallengeRequest");
+        let data =
+            deterministic_cbor_into_vec(&self).expect("failed to serialize ChallengeRequest");
         sha3_256(&data)
     }
 

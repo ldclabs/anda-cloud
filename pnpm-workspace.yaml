@@ -1,0 +1,4 @@
+packages:
+  - examples/ts/anda_x402
+  - ts/anda_cloud_website
+  - ts/anda_x402

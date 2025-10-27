@@ -12,6 +12,7 @@
   },
   "type": "module",
   "workspaces": [
+    "ts/anda_x402",
     "ts/anda_cloud_website"
   ]
 }
