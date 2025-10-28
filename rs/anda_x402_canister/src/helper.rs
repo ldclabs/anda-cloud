@@ -118,6 +118,7 @@ pub async fn transfer_token_from(
     res.map_err(|err| format!("failed to transfer tokens from user, error: {:?}", err))
 }
 
+#[allow(dead_code)]
 pub async fn token_allowance(
     asset: Principal,
     from: Principal,

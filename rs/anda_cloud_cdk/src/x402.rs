@@ -10,7 +10,6 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
     str::FromStr,
 };
-use url::Url;
 
 use crate::{SignedEnvelope, sha3_256};
 
@@ -152,8 +151,8 @@ pub struct PaymentRequirements {
     pub asset: Principal,
     /// Recipient wallet address for the payment
     pub pay_to: Principal,
-    /// URL of the protected resource
-    pub resource: Url,
+    /// the protected resource, e.g., URL of the resource endpoint
+    pub resource: String,
     /// Human-readable description of the resource
     pub description: String,
     /// MIME type of the expected response
@@ -309,7 +308,7 @@ impl X402Request {
         }
 
         if self.payment_payload.payload.authorization.value.0
-            != self.payment_requirements.max_amount_required.0
+            < self.payment_requirements.max_amount_required.0
         {
             return Err(X402Error::InvalidPayloadAuthorizationValue(format!(
                 "{}, expected: {}",
@@ -618,7 +617,7 @@ mod tests {
             max_amount_required: TokenAmount(1000),
             asset: principal,
             pay_to: principal,
-            resource: Url::from_str("https://example.com").unwrap(),
+            resource: "https://example.com".to_string(),
             description: "Test resource".to_string(),
             mime_type: None,
             output_schema: None,

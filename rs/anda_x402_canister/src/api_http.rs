@@ -29,7 +29,11 @@ static IC_CERTIFICATE_EXPRESSION_HEADER: &str = "ic-certificateexpression";
 
 #[ic_cdk::query(hidden = true)]
 async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
-    if request.method().as_str() == "POST" {
+    let req_path = request.get_path();
+    if request.method().as_str() == "POST"
+        && let Ok(path) = req_path.as_ref()
+        && path == "/settle"
+    {
         return HttpResponse {
             status_code: 200,
             headers: vec![],
@@ -65,7 +69,7 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
         ),
     ];
 
-    let req_path = match request.get_path() {
+    let req_path = match req_path {
         Ok(path) => path,
         Err(err) => {
             headers.push(("content-type".to_string(), "text/plain".to_string()));
@@ -84,6 +88,7 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
         ("HEAD", _) => Ok(Vec::new()),
         ("GET", "/") => get_info(in_cbor),
         ("GET", "/supported") => get_supported(in_cbor),
+        ("POST", "/verify") => post_verify(request.body(), in_cbor).await,
         (method, path) => Err(HttpError {
             status_code: 404,
             message: format!("method {method}, path: {path}"),
@@ -137,7 +142,6 @@ async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpRespons
     let in_cbor = supports_cbor(request.headers());
 
     let rt = match (request.method().as_str(), req_path.as_str()) {
-        ("POST", "/verify") => post_verify(request.body(), in_cbor).await,
         ("POST", "/settle") => post_settle(request.body(), in_cbor).await,
         (method, path) => Err(HttpError {
             status_code: 404,
@@ -301,32 +305,33 @@ async fn verify_payment(
         .verify_signature(now_ms, Some(canister_self))
         .map_err(|err| (X402Error::InvalidPayloadAuthorizationSignature(err), None))?;
 
-    let asset_info =
-        store::state::verify_payload(payer, canister_self, &req.payment_payload, now_ms)
-            .map_err(|err| (err, Some(payer)))?;
-    let required_amount = req
-        .payment_payload
-        .payload
-        .authorization
-        .value
-        .0
-        .checked_add(asset_info.transfer_fee)
-        .ok_or_else(|| {
-            (
-                X402Error::InvalidPayload("payment amount overflow".to_string()),
-                Some(payer),
-            )
-        })?;
-
-    store::state::check_funds(
-        payer,
-        canister_self,
-        req.payment_requirements.asset,
-        required_amount,
-        now_ms,
-    )
-    .await
-    .map_err(|err| (err, Some(payer)))?;
+    let _ = store::state::verify_payload(payer, canister_self, &req.payment_payload, now_ms)
+        .map_err(|err| (err, Some(payer)))?;
+    // `check_funds` relies on Inter-canister calls, which leads to expensive update calls.
+    // To optimize the verification process, we skip the fund checking here.
+    // let required_amount = req
+    //     .payment_payload
+    //     .payload
+    //     .authorization
+    //     .value
+    //     .0
+    //     .checked_add(asset_info.transfer_fee)
+    //     .ok_or_else(|| {
+    //         (
+    //             X402Error::InvalidPayload("payment amount overflow".to_string()),
+    //             Some(payer),
+    //         )
+    //     })?;
+    //
+    // store::state::check_funds(
+    //     payer,
+    //     canister_self,
+    //     req.payment_requirements.asset,
+    //     required_amount,
+    //     now_ms,
+    // )
+    // .await
+    // .map_err(|err| (err, Some(payer)))?;
     Ok(payer)
 }
 

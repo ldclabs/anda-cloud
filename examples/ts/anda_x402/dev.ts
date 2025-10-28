@@ -31,7 +31,7 @@ async function main() {
         maxAmountRequired: '100000000', // 1 PANDA
         asset: assetId,
         payTo,
-        resource: 'https://github.com/ldclabs',
+        resource: 'https://anda.ai',
         description: 'Payment for some resource',
         maxTimeoutSeconds: 300
       }

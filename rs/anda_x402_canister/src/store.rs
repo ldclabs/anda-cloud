@@ -371,6 +371,7 @@ pub mod state {
         Ok(asset_info)
     }
 
+    #[allow(dead_code)]
     pub async fn check_funds(
         payer: Principal,
         canister_self: Principal,

@@ -74,7 +74,7 @@ async function main() {
         maxAmountRequired: amount.toString(),
         asset: assetId,
         payTo,
-        resource: 'https://github.com/ldclabs',
+        resource: 'https://anda.ai',
         description: 'Payment for some resource',
         maxTimeoutSeconds: 300
       }
@@ -139,6 +139,7 @@ async function main() {
   })
   const settleJson = await settleRes.json()
   console.log('\n\nSettle Response:', settleJson)
+
   // Settle Response: {
   //   success: true,
   //   transaction: '3:druyg-tyaaa-aaaaq-aactq-cai:30',
