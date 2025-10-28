@@ -136,7 +136,9 @@ export class X402Canister {
         res.supported_assets.map(([principal, info]) => [
           principal.toText(),
           {
+            name: info.name,
             symbol: info.symbol,
+            logo: info.logo[0],
             decimals: info.decimals,
             transferFee: info.transfer_fee,
             paymentFee: info.payment_fee

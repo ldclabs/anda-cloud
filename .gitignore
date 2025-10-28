@@ -24,3 +24,4 @@ node_modules/
 
 # Cargo.lock
 proposal-message.json
+**/*identity.json

@@ -147,7 +147,9 @@ pub async fn token_info(asset: Principal) -> Result<store::AssetInfo, String> {
     let mut info = store::AssetInfo::default();
     for (key, value) in res {
         match (key.as_str(), value) {
+            ("icrc1:name", MetadataValue::Text(val)) => info.name = val,
             ("icrc1:symbol", MetadataValue::Text(val)) => info.symbol = val,
+            ("icrc1:logo", MetadataValue::Text(val)) => info.logo = Some(val),
             ("icrc1:decimals", MetadataValue::Nat(val)) => {
                 info.decimals = val.0.to_u8().unwrap_or_default()
             }
@@ -166,6 +168,9 @@ pub async fn token_info(asset: Principal) -> Result<store::AssetInfo, String> {
     }
     if info.transfer_fee == 0 {
         return Err("asset transfer fee is missing".to_string());
+    }
+    if info.name.is_empty() {
+        info.name = info.symbol.clone();
     }
     Ok(info)
 }

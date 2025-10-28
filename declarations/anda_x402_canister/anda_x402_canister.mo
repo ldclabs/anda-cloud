@@ -5,6 +5,8 @@ module {
   public type AssetInfo = {
     decimals : Nat8;
     transfer_fee : Nat;
+    logo : ?Text;
+    name : Text;
     payment_fee : Nat;
     symbol : Text;
   };

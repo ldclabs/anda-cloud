@@ -5,6 +5,8 @@ import type { IDL } from '@dfinity/candid';
 export interface AssetInfo {
   'decimals' : number,
   'transfer_fee' : bigint,
+  'logo' : [] | [string],
+  'name' : string,
   'payment_fee' : bigint,
   'symbol' : string,
 }

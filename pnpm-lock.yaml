@@ -19,6 +19,9 @@ importers:
       '@dfinity/principal':
         specifier: '>=3.2.0'
         version: 3.4.1
+      '@dfinity/utils':
+        specifier: '>=3.2.0'
+        version: 3.2.0(@dfinity/agent@3.4.1(@dfinity/candid@3.4.1(@dfinity/principal@3.4.1))(@dfinity/principal@3.4.1)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.1(@dfinity/principal@3.4.1))(@dfinity/principal@3.4.1)
       '@ldclabs/anda_x402':
         specifier: ../../../ts/anda_x402
         version: link:../../../ts/anda_x402
@@ -36,7 +39,7 @@ importers:
         specifier: ^9.6.1
         version: 9.6.1
       '@types/node':
-        specifier: 24.3.0
+        specifier: ^24.3.0
         version: 24.3.0
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.42.0
@@ -221,6 +224,13 @@ packages:
 
   '@dfinity/principal@3.4.1':
     resolution: {integrity: sha512-pXabsgcJDhRhj7/AaV7dLZKF8L4sK0vuzaGVBBtQ+8FxWXeXlvKn/Vxbwy8BCkIU7SHzJuBpYT2tz1oE6oNmbA==}
+
+  '@dfinity/utils@3.2.0':
+    resolution: {integrity: sha512-5G7KkZ7/4qOTeX7ptlUOvYdGSVHfO0oQrNddYtVuqzQJ8L4lA58ju4OUzuE5DTuD1pvZjIDavJLWezQ4Bug6Vg==}
+    peerDependencies:
+      '@dfinity/agent': ^3
+      '@dfinity/candid': ^3
+      '@dfinity/principal': ^3
 
   '@emnapi/runtime@1.6.0':
     resolution: {integrity: sha512-obtUmAHTMjll499P+D9A3axeJFlhdjOWdKUNs/U6QIGT7V5RjcUW1xToAzjvmgTSQhDbYn/NwfTRoJcQ2rNBxA==}
@@ -2475,6 +2485,12 @@ snapshots:
   '@dfinity/principal@3.4.1':
     dependencies:
       '@noble/hashes': 1.8.0
+
+  '@dfinity/utils@3.2.0(@dfinity/agent@3.4.1(@dfinity/candid@3.4.1(@dfinity/principal@3.4.1))(@dfinity/principal@3.4.1)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.1(@dfinity/principal@3.4.1))(@dfinity/principal@3.4.1)':
+    dependencies:
+      '@dfinity/agent': 3.4.1(@dfinity/candid@3.4.1(@dfinity/principal@3.4.1))(@dfinity/principal@3.4.1)(@noble/hashes@1.8.0)
+      '@dfinity/candid': 3.4.1(@dfinity/principal@3.4.1)
+      '@dfinity/principal': 3.4.1
 
   '@emnapi/runtime@1.6.0':
     dependencies:

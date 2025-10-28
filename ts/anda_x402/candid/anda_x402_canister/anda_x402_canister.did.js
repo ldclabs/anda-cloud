@@ -23,6 +23,8 @@ export const idlFactory = ({ IDL }) => {
   const AssetInfo = IDL.Record({
     'decimals' : IDL.Nat8,
     'transfer_fee' : IDL.Nat,
+    'logo' : IDL.Opt(IDL.Text),
+    'name' : IDL.Text,
     'payment_fee' : IDL.Nat,
     'symbol' : IDL.Text,
   });

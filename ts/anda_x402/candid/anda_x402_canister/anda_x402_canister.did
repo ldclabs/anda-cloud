@@ -1,6 +1,8 @@
 type AssetInfo = record {
   decimals : nat8;
   transfer_fee : nat;
+  logo : opt text;
+  name : text;
   payment_fee : nat;
   symbol : text;
 };

@@ -36,10 +36,14 @@ pub struct State {
 
 #[derive(Clone, CandidType, Default, Deserialize, Serialize)]
 pub struct AssetInfo {
+    #[serde(default)]
+    pub name: String,
     pub symbol: String,
     pub decimals: u8,
     pub transfer_fee: u128,
     pub payment_fee: u128,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logo: Option<String>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

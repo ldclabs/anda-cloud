@@ -67,10 +67,12 @@ export interface SupportedPaymentKind {
 }
 
 export interface AssetInfo {
+  name: string
+  symbol: string
   decimals: number
   transferFee: bigint
   paymentFee: bigint
-  symbol: string
+  logo?: string
 }
 
 export interface PaymentLogInfo {
@@ -126,4 +128,22 @@ export interface StateInfo {
   totalWithdrawnFees: Record<string, bigint>
   totalCollectedFees: Record<string, bigint>
   governanceCanister?: string
+}
+
+const locale = new Intl.Locale(globalThis?.navigator?.language || 'en')
+
+export function formatAmount(
+  amount: bigint,
+  decimals: number,
+  maxDigits: number = 6
+): string {
+  const decimalVal = 10n ** BigInt(decimals)
+  const integerPart = amount / decimalVal
+  const fractionalPart = amount % decimalVal
+  const val = Number(integerPart) + Number(fractionalPart) / Number(decimalVal)
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDigits,
+    roundingMode: 'trunc'
+  } as Intl.NumberFormatOptions).format(val)
 }
