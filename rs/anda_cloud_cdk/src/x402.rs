@@ -185,9 +185,9 @@ pub struct PaymentPayload {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IcpPayload {
-    /// ICP based signature over the authorization data
+    /// The signature of the `authorization` signed by Internet Identity
     pub signature: ByteBufB64,
-    /// Authorization parameters for the payment
+    /// Parameters required for payment.
     pub authorization: IcpPayloadAuthorization,
 }
 
@@ -211,7 +211,7 @@ impl IcpPayload {
 pub struct IcpPayloadAuthorization {
     /// Payment scheme identifier
     pub scheme: Scheme,
-    /// token ledger canister address
+    /// ICRC2 token ledger canister address
     pub asset: Principal,
     /// Recipient's wallet address
     pub to: Principal,
@@ -219,7 +219,7 @@ pub struct IcpPayloadAuthorization {
     /// For `exact` scheme, this is the exact amount to be transferred.
     /// For `upto` scheme, this is the maximum amount that can be transferred.
     pub value: TokenAmount,
-    /// Unix timestamp when authorization expires (in milliseconds)
+    /// Expiration time of the authorization in milliseconds since epoch
     pub expires_at: u64,
     /// A self-incrementing number and should be used to prevent replay attacks.
     pub nonce: u64,

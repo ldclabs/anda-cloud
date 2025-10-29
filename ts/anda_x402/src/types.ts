@@ -1,16 +1,27 @@
 import { Principal } from '@dfinity/principal'
 
 export interface PaymentRequirements {
+  /// Payment scheme identifier (e.g., "exact")
   scheme: 'exact' | 'upto'
+  /// Blockchain network identifier (e.g., "icp-druyg-tyaaa-aaaaq-aactq-cai")
   network: string
+  /// Required payment amount in atomic token units
   maxAmountRequired: string
+  /// Token ledger canister address
   asset: string
+  /// Recipient wallet address for the payment
   payTo: string
+  /// the protected resource, e.g., URL of the resource endpoint
   resource: string
+  /// Human-readable description of the resource
   description: string
+  /// MIME type of the expected response
   mimeType?: string
+  /// JSON schema describing the response format
   outputSchema?: object
+  /// Maximum time allowed for payment completion in seconds
   maxTimeoutSeconds: number
+  /// Scheme-specific additional information.
   extra?: object
 }
 
@@ -28,16 +39,26 @@ export interface PaymentPayload {
 }
 
 export interface IcpPayload {
+  /// The signature of the `authorization` signed by Internet Identity
   signature: string
+  /// Parameters required for payment.
   authorization: IcpPayloadAuthorization
 }
 
 export interface IcpPayloadAuthorization {
+  /// Payment scheme identifier
   scheme: 'exact' | 'upto'
+  /// ICRC2 token ledger canister address
   asset: string
+  /// Recipient's wallet address
   to: string
+  /// Payment amount in atomic units.
+  /// For `exact` scheme, this is the exact amount to be transferred.
+  /// For `upto` scheme, this is the maximum amount that can be transferred.
   value: string
+  /// Expiration time of the authorization in milliseconds since epoch
   expiresAt: number
+  /// A self-incrementing number and should be used to prevent replay attacks.
   nonce: number
 }
 
