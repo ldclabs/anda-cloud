@@ -25,7 +25,7 @@ jobs:
           for CAN in anda_registry_canister anda_x402_canister
           do
             cp "target/wasm32-unknown-unknown/release/$CAN.wasm" out/
-            cp "src/$CAN/$CAN.did" "out/$CAN.did"
+            cp "rs/$CAN/$CAN.did" "out/$CAN.did"
             WASM="out/$CAN.wasm"
             ic-wasm $WASM -o $WASM metadata candid:service -f "out/$CAN.did" -v public
             ic-wasm $WASM -o $WASM shrink
