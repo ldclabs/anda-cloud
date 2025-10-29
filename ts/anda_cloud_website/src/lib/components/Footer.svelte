@@ -1,5 +1,6 @@
 <script lang="ts">
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
+  import RedLove from '$lib/icons/red-love.svelte'
 
   const year = new Date().getFullYear()
 </script>
@@ -14,12 +15,17 @@
       />
       <p class="max-w-sm text-sm leading-relaxed text-white/80"
         >We are building the foundational infrastructure and applications that
-        empower AI agents to thrive as first-class citizens in the Web3.</p
+        empower AI agents to thrive as first-class citizens in the Web3. <span><RedLove /></span>
+    <a
+      href="https://www.coingecko.com/en/coins/icpanda-dao"
+      target="_blank"
+      class="text-emerald-500 underline underline-offset-2">PANDA</a
+    ></p
       >
     </div>
     <div>
       <h4 class="mb-3 font-semibold">Resources</h4>
-      <ul class="space-y-2 text-[var(--color-text-dim)]">
+      <ul class="space-y-2 text-(--color-text-dim)">
         <li>
           <a
             class="flex items-center gap-1 hover:text-white"
@@ -128,8 +134,8 @@
       </ul>
     </div>
   </div>
-  <div class="mt-14 text-center text-xs text-[var(--color-text-dim)]"
-    >© {year}
+  <div class="mt-14 text-center text-xs text-(--color-text-dim)">
+    © {year}
     <a
       href="https://dashboard.internetcomputer.org/sns/d7wvo-iiaaa-aaaaq-aacsq-cai"
       target="_blank"

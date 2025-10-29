@@ -95,7 +95,7 @@ servePremiumContent();
             href="https://1bridge.app"
             target="_blank"
           ><b class="hover:text-emerald-500">One Bridge</b></a> technology,
-            accept payments in tokens from Ethereum, BNB chain, and other major
+            will accept payments in tokens from Ethereum, BNB chain, Solana and other major
             blockchains seamlessly.</span
           ></li
         >
