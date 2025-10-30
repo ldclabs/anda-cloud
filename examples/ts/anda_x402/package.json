@@ -23,7 +23,7 @@
     "@dfinity/identity": ">=3.2.0",
     "@dfinity/principal": ">=3.2.0",
     "@ldclabs/anda_x402": "../../../ts/anda_x402",
-    "@ldclabs/ic-auth": "^0.1.2",
+    "@ldclabs/ic-auth": "^0.2.0",
     "@noble/hashes": "^1.8.0",
     "cborg": ">=4.2.0"
   },

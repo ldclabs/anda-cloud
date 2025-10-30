@@ -19,7 +19,7 @@ import type {
 } from './types.js'
 import {
   toDelegationIdentity,
-  signCborMessage,
+  signMessage,
   deterministicEncode,
   bytesToBase64Url
 } from '@ldclabs/ic-auth'
@@ -73,8 +73,8 @@ export class X402Canister {
   }
 
   async signPayload(data: IcpPayloadAuthorization): Promise<string> {
-    const sig = await signCborMessage(this.#identity, data)
-    delete sig.h
+    const sig = await signMessage(this.#identity, data)
+    delete sig.h // remove 'h' field as it's not needed for verification
     return bytesToBase64Url(deterministicEncode(sig))
   }
 
