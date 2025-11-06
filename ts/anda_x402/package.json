@@ -1,6 +1,6 @@
 {
   "name": "@ldclabs/anda_x402",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "The Typescript version of the client SDK for the Anda x402.",
   "license": "MIT",
@@ -33,7 +33,7 @@
     "ncu": "npx npm-check-updates -u"
   },
   "dependencies": {
-    "@ldclabs/ic-auth": "^0.2.1"
+    "@ldclabs/ic-auth": "^0.2.0"
   },
   "peerDependencies": {
     "@dfinity/agent": ">=3.2.0",
