@@ -12,6 +12,11 @@ module {
   };
   public type CanisterArgs = { #Upgrade : UpgradeArgs; #Init : InitArgs };
   public type InitArgs = { governance_canister : ?Principal; name : Text };
+  public type PayerStateInfo = {
+    next_nonce : Nat64;
+    logs : [Nat64];
+    total_sent : [(Principal, Nat)];
+  };
   public type PaymentLogInfo = {
     id : Nat64;
     to : Principal;
@@ -27,9 +32,10 @@ module {
   public type Result = { #Ok; #Err : Text };
   public type Result_1 = { #Ok : Nat; #Err : Text };
   public type Result_2 = { #Ok : State; #Err : Text };
-  public type Result_3 = { #Ok : [PaymentLogInfo]; #Err : Text };
-  public type Result_4 = { #Ok : Nat64; #Err : Text };
-  public type Result_5 = { #Ok : Text; #Err : Text };
+  public type Result_3 = { #Ok : PayerStateInfo; #Err : Text };
+  public type Result_4 = { #Ok : [PaymentLogInfo]; #Err : Text };
+  public type Result_5 = { #Ok : Nat64; #Err : Text };
+  public type Result_6 = { #Ok : Text; #Err : Text };
   public type Scheme = { #Exact; #Upto };
   public type State = {
     total_withdrawn_fees : [(Principal, Nat)];
@@ -38,6 +44,7 @@ module {
     governance_canister : ?Principal;
     name : Text;
     supported_assets : [(Principal, AssetInfo)];
+    key_name : Text;
   };
   public type SupportedPaymentKind = {
     scheme : Scheme;
@@ -56,25 +63,26 @@ module {
       ) -> async Result;
     admin_update_supported_asset : shared (Principal, Nat) -> async Result;
     info : shared query () -> async Result_2;
-    my_payment_logs : shared query (Nat32, ?Nat64) -> async Result_3;
-    next_nonce : shared query () -> async Result_4;
+    my_info : shared query () -> async Result_3;
+    my_payment_logs : shared query (Nat32, ?Nat64) -> async Result_4;
+    next_nonce : shared query () -> async Result_5;
     validate_admin_add_supported_payment : shared (
         X402Version,
         Scheme,
-      ) -> async Result_5;
+      ) -> async Result_6;
     validate_admin_collect_fees : shared (
         Principal,
         Principal,
         Nat,
-      ) -> async Result_5;
+      ) -> async Result_6;
     validate_admin_remove_supported_payment : shared (
         X402Version,
         Scheme,
-      ) -> async Result_5;
+      ) -> async Result_6;
     validate_admin_update_supported_asset : shared (
         Principal,
         Nat,
-      ) -> async Result_5;
-    validate_remove_update_supported_asset : shared Principal -> async Result_5;
+      ) -> async Result_6;
+    validate_remove_update_supported_asset : shared Principal -> async Result_6;
   }
 }

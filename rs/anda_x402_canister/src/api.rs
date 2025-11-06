@@ -12,6 +12,12 @@ fn next_nonce() -> Result<u64, String> {
 }
 
 #[ic_cdk::query]
+fn my_info() -> Result<store::PayerStateInfo, String> {
+    let caller = msg_caller()?;
+    Ok(store::state::payer_info(caller))
+}
+
+#[ic_cdk::query]
 fn my_payment_logs(take: u32, prev: Option<u64>) -> Result<Vec<store::PaymentLogInfo>, String> {
     let caller = msg_caller()?;
     let take = take.clamp(2, 100) as usize;

@@ -1,4 +1,4 @@
-use anda_cloud_cdk::x402::{IcpNetwork, SettleResponse, VerifyResponse, X402Error, X402Request};
+use anda_cloud_cdk::x402::{SettleResponse, VerifyResponse, X402Error, X402Request};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use candid::{CandidType, Principal};
 use ciborium::from_reader;
@@ -240,7 +240,7 @@ async fn post_verify(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
 async fn post_settle(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
     let canister_self = ic_cdk::api::canister_self();
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    let network = IcpNetwork(canister_self);
+    let network = "icp".to_string();
 
     let req = match decode_payment(body, in_cbor) {
         Ok(req) => settle_payment(canister_self, req, now_ms).await,
@@ -305,7 +305,7 @@ async fn verify_payment(
         .verify_signature(now_ms, Some(canister_self))
         .map_err(|err| (X402Error::InvalidPayloadAuthorizationSignature(err), None))?;
 
-    let _ = store::state::verify_payload(payer, canister_self, &req.payment_payload, now_ms)
+    let _ = store::state::verify_payload(payer, &req.payment_payload, now_ms)
         .map_err(|err| (err, Some(payer)))?;
     // `check_funds` relies on Inter-canister calls, which leads to expensive update calls.
     // To optimize the verification process, we skip the fund checking here.
@@ -346,9 +346,8 @@ async fn settle_payment(
         .verify_signature(now_ms, Some(canister_self))
         .map_err(|err| (X402Error::InvalidPayloadAuthorizationSignature(err), None))?;
 
-    let asset_info =
-        store::state::verify_payload(payer, canister_self, &req.payment_payload, now_ms)
-            .map_err(|err| (err, Some(payer)))?;
+    let asset_info = store::state::verify_payload(payer, &req.payment_payload, now_ms)
+        .map_err(|err| (err, Some(payer)))?;
 
     let log = store::PaymentLog {
         scheme: req.payment_payload.payload.authorization.scheme,

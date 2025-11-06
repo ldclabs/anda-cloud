@@ -47,7 +47,7 @@ export class X402Canister {
     host?: string
   ) {
     this.canisterId = toPrincipal(canisterId)
-    this.network = `icp-${this.canisterId.toText()}`
+    this.network = `icp`
     this.endpoint = `https://${this.canisterId.toText()}.icp0.io`
     this.#identity = toDelegationIdentity(identity)
 

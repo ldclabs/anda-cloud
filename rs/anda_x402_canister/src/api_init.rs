@@ -1,4 +1,4 @@
-use anda_cloud_cdk::x402::{IcpNetwork, Scheme, SupportedPaymentKind, X402Version};
+use anda_cloud_cdk::x402::{Scheme, SupportedPaymentKind, X402Version};
 use candid::{CandidType, Principal};
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -29,7 +29,7 @@ fn init(args: Option<CanisterArgs>) {
         store::state::with_mut(|s| {
             s.name = args.name;
 
-            let network = IcpNetwork(ic_cdk::api::canister_self()).to_string();
+            let network = "icp".to_string();
             s.supported_payments = BTreeSet::from([SupportedPaymentKind {
                 x402_version: X402Version::V1,
                 scheme: Scheme::Exact,

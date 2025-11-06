@@ -1,4 +1,4 @@
-use anda_cloud_cdk::x402::{IcpNetwork, Scheme, SupportedPaymentKind, X402Version};
+use anda_cloud_cdk::x402::{Scheme, SupportedPaymentKind, X402Version};
 use candid::{Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 
@@ -12,7 +12,7 @@ fn admin_add_supported_payment(x402_version: X402Version, scheme: Scheme) -> Res
     let payment = SupportedPaymentKind {
         x402_version,
         scheme,
-        network: IcpNetwork(ic_cdk::api::canister_self()).to_string(),
+        network: "icp".to_string(),
     };
 
     if scheme == Scheme::Upto {
@@ -41,7 +41,7 @@ fn admin_remove_supported_payment(x402_version: X402Version, scheme: Scheme) -> 
     let payment = SupportedPaymentKind {
         x402_version,
         scheme,
-        network: IcpNetwork(ic_cdk::api::canister_self()).to_string(),
+        network: "icp".to_string(),
     };
     store::state::with_mut(|s| {
         s.supported_payments.retain(|p| p != &payment);

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     cell::RefCell,
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     time::Duration,
 };
 
@@ -27,10 +27,12 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 #[derive(Clone, CandidType, Default, Deserialize, Serialize)]
 pub struct State {
     pub name: String, // facilitator name
+    #[serde(default)]
+    pub key_name: String,
     pub supported_payments: BTreeSet<SupportedPaymentKind>,
-    pub supported_assets: HashMap<Principal, AssetInfo>,
-    pub total_collected_fees: HashMap<Principal, u128>,
-    pub total_withdrawn_fees: HashMap<Principal, u128>,
+    pub supported_assets: BTreeMap<Principal, AssetInfo>,
+    pub total_collected_fees: BTreeMap<Principal, u128>,
+    pub total_withdrawn_fees: BTreeMap<Principal, u128>,
     pub governance_canister: Option<Principal>,
 }
 
@@ -51,8 +53,15 @@ struct PayerState {
     #[serde(rename = "n")]
     pub next_nonce: u64,
     #[serde(rename = "t")]
-    pub total_sent: HashMap<Principal, u128>,
+    pub total_sent: BTreeMap<Principal, u128>,
     #[serde(rename = "l")]
+    pub logs: BTreeSet<u64>,
+}
+
+#[derive(Clone, CandidType, Deserialize, Serialize)]
+pub struct PayerStateInfo {
+    pub next_nonce: u64,
+    pub total_sent: BTreeMap<Principal, u128>,
     pub logs: BTreeSet<u64>,
 }
 
@@ -60,8 +69,18 @@ impl Default for PayerState {
     fn default() -> Self {
         PayerState {
             next_nonce: 1,
-            total_sent: HashMap::new(),
+            total_sent: BTreeMap::new(),
             logs: BTreeSet::new(),
+        }
+    }
+}
+
+impl From<PayerState> for PayerStateInfo {
+    fn from(state: PayerState) -> Self {
+        PayerStateInfo {
+            next_nonce: state.next_nonce,
+            total_sent: state.total_sent,
+            logs: state.logs,
         }
     }
 }
@@ -269,6 +288,13 @@ pub mod state {
         })
     }
 
+    pub fn payer_info(caller: Principal) -> PayerStateInfo {
+        PAYER_STATE.with_borrow(|r| {
+            let s = r.get(&caller).unwrap_or_default();
+            s.into()
+        })
+    }
+
     pub fn user_logs(user: Principal, take: usize, prev: Option<u64>) -> Vec<PaymentLogInfo> {
         PAYER_STATE.with_borrow(|r| {
             let item = r.get(&user).unwrap_or_default();
@@ -303,7 +329,6 @@ pub mod state {
 
     pub fn verify_payload(
         payer: Principal,
-        canister_self: Principal,
         payload: &PaymentPayload,
         now_ms: u64,
     ) -> Result<AssetInfo, X402Error> {
@@ -315,11 +340,10 @@ pub mod state {
         }
 
         let asset_info = with(|state| {
-            if payload.network.0 != canister_self {
+            if &payload.network != "icp" {
                 return Err(X402Error::InvalidNetwork(format!(
-                    "{}, expected: {}",
-                    payload.network,
-                    IcpNetwork(canister_self)
+                    "{}, expected: icp",
+                    payload.network
                 )));
             }
 

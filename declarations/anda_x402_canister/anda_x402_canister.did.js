@@ -35,8 +35,15 @@ export const idlFactory = ({ IDL }) => {
     'governance_canister' : IDL.Opt(IDL.Principal),
     'name' : IDL.Text,
     'supported_assets' : IDL.Vec(IDL.Tuple(IDL.Principal, AssetInfo)),
+    'key_name' : IDL.Text,
   });
   const Result_2 = IDL.Variant({ 'Ok' : State, 'Err' : IDL.Text });
+  const PayerStateInfo = IDL.Record({
+    'next_nonce' : IDL.Nat64,
+    'logs' : IDL.Vec(IDL.Nat64),
+    'total_sent' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
+  });
+  const Result_3 = IDL.Variant({ 'Ok' : PayerStateInfo, 'Err' : IDL.Text });
   const PaymentLogInfo = IDL.Record({
     'id' : IDL.Nat64,
     'to' : IDL.Principal,
@@ -49,12 +56,12 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Nat64,
     'expires_at' : IDL.Nat64,
   });
-  const Result_3 = IDL.Variant({
+  const Result_4 = IDL.Variant({
     'Ok' : IDL.Vec(PaymentLogInfo),
     'Err' : IDL.Text,
   });
-  const Result_4 = IDL.Variant({ 'Ok' : IDL.Nat64, 'Err' : IDL.Text });
-  const Result_5 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
+  const Result_5 = IDL.Variant({ 'Ok' : IDL.Nat64, 'Err' : IDL.Text });
+  const Result_6 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
   return IDL.Service({
     'admin_add_supported_payment' : IDL.Func(
         [X402Version, Scheme],
@@ -78,35 +85,36 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'info' : IDL.Func([], [Result_2], ['query']),
+    'my_info' : IDL.Func([], [Result_3], ['query']),
     'my_payment_logs' : IDL.Func(
         [IDL.Nat32, IDL.Opt(IDL.Nat64)],
-        [Result_3],
+        [Result_4],
         ['query'],
       ),
-    'next_nonce' : IDL.Func([], [Result_4], ['query']),
+    'next_nonce' : IDL.Func([], [Result_5], ['query']),
     'validate_admin_add_supported_payment' : IDL.Func(
         [X402Version, Scheme],
-        [Result_5],
+        [Result_6],
         [],
       ),
     'validate_admin_collect_fees' : IDL.Func(
         [IDL.Principal, IDL.Principal, IDL.Nat],
-        [Result_5],
+        [Result_6],
         [],
       ),
     'validate_admin_remove_supported_payment' : IDL.Func(
         [X402Version, Scheme],
-        [Result_5],
+        [Result_6],
         [],
       ),
     'validate_admin_update_supported_asset' : IDL.Func(
         [IDL.Principal, IDL.Nat],
-        [Result_5],
+        [Result_6],
         [],
       ),
     'validate_remove_update_supported_asset' : IDL.Func(
         [IDL.Principal],
-        [Result_5],
+        [Result_6],
         [],
       ),
   });

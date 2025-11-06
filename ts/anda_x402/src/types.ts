@@ -3,7 +3,7 @@ import { Principal } from '@dfinity/principal'
 export interface PaymentRequirements {
   /// Payment scheme identifier (e.g., "exact")
   scheme: 'exact' | 'upto'
-  /// Blockchain network identifier (e.g., "icp-druyg-tyaaa-aaaaq-aactq-cai")
+  /// Blockchain network identifier (e.g., "icp")
   network: string
   /// Required payment amount in atomic token units
   maxAmountRequired: string
@@ -116,18 +116,6 @@ export interface TokenInfo {
   fee: bigint
   logo: string
   canisterId: Principal
-}
-
-export function parseNetwork(network: string): Principal {
-  if (network.startsWith('icp-')) {
-    return Principal.fromText(network.slice(4))
-  }
-
-  throw new Error(`Unsupported network format: ${network}`)
-}
-
-export function toNetwork(principal: Principal): string {
-  return `icp-${principal.toText()}`
 }
 
 /// Parses a transaction string in the format "log_id:asset_canister:block_idx"

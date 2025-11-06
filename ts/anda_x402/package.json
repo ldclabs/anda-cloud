@@ -33,7 +33,7 @@
     "ncu": "npx npm-check-updates -u"
   },
   "dependencies": {
-    "@ldclabs/ic-auth": "^0.2.0"
+    "@ldclabs/ic-auth": "^0.2.1"
   },
   "peerDependencies": {
     "@dfinity/agent": ">=3.2.0",

@@ -143,8 +143,8 @@ impl<'de> Deserialize<'de> for X402Version {
 pub struct PaymentRequirements {
     /// Payment scheme identifier (e.g., "exact")
     pub scheme: Scheme,
-    /// Blockchain network identifier (e.g., "icp-druyg-tyaaa-aaaaq-aactq-cai")
-    pub network: IcpNetwork,
+    /// Blockchain network identifier (e.g., "icp")
+    pub network: String,
     /// Required payment amount in atomic token units
     pub max_amount_required: TokenAmount,
     /// Token ledger canister address
@@ -176,7 +176,7 @@ pub struct PaymentPayload {
     /// Payment scheme identifier (e.g., "exact")
     pub scheme: Scheme,
     /// Blockchain network identifier
-    pub network: IcpNetwork,
+    pub network: String,
     /// Payment data object
     pub payload: IcpPayload,
 }
@@ -371,7 +371,7 @@ pub struct SettleResponse {
     /// Blockchain transaction hash (empty string if settlement failed)
     pub transaction: String,
     /// Blockchain network identifier
-    pub network: IcpNetwork,
+    pub network: String,
     /// Address of the payer's wallet
     pub payer: String,
 }
@@ -423,47 +423,6 @@ impl<'de> Deserialize<'de> for Scheme {
     {
         let s = String::deserialize(deserializer)?;
         Scheme::from_str(&s).map_err(serde::de::Error::custom)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IcpNetwork(pub Principal);
-
-impl Display for IcpNetwork {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "icp-{}", self.0)
-    }
-}
-
-impl FromStr for IcpNetwork {
-    type Err = X402Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some(stripped) = s.strip_prefix("icp-") {
-            let principal = Principal::from_str(stripped)
-                .map_err(|e| X402Error::InvalidNetwork(format!("invalid principal: {}", e)))?;
-            Ok(IcpNetwork(principal))
-        } else {
-            Err(X402Error::InvalidNetwork(
-                "network must start with 'icp-'".to_string(),
-            ))
-        }
-    }
-}
-
-impl Serialize for IcpNetwork {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for IcpNetwork {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        IcpNetwork::from_str(&s).map_err(serde::de::Error::custom)
     }
 }
 
@@ -568,38 +527,6 @@ mod tests {
     }
 
     #[test]
-    fn test_icp_network_serialization() {
-        let principal = Principal::from_text("ryjl3-tyaaa-aaaaa-aaaba-cai").unwrap();
-        let network = IcpNetwork(principal);
-        let serialized = serde_json::to_string(&network).unwrap();
-        assert_eq!(serialized, "\"icp-ryjl3-tyaaa-aaaaa-aaaba-cai\"");
-        let deserialized: IcpNetwork = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized, network);
-    }
-
-    #[test]
-    fn test_icp_network_from_str() {
-        let valid_str = "icp-ryjl3-tyaaa-aaaaa-aaaba-cai";
-        let network = IcpNetwork::from_str(valid_str).unwrap();
-        assert_eq!(
-            network.0,
-            Principal::from_text("ryjl3-tyaaa-aaaaa-aaaba-cai").unwrap()
-        );
-
-        let invalid_prefix = "ryjl3-tyaaa-aaaaa-aaaba-cai";
-        assert!(matches!(
-            IcpNetwork::from_str(invalid_prefix),
-            Err(X402Error::InvalidNetwork(_))
-        ));
-
-        let invalid_principal = "icp-invalid";
-        assert!(matches!(
-            IcpNetwork::from_str(invalid_principal),
-            Err(X402Error::InvalidNetwork(_))
-        ));
-    }
-
-    #[test]
     fn test_token_amount_serialization() {
         let amount = TokenAmount(123456789012345678901234567890);
         let serialized = serde_json::to_string(&amount).unwrap();
@@ -613,7 +540,7 @@ mod tests {
         let principal = Principal::from_text("ryjl3-tyaaa-aaaaa-aaaba-cai").unwrap();
         let req = PaymentRequirements {
             scheme: Scheme::Exact,
-            network: IcpNetwork(principal),
+            network: "icp".to_string(),
             max_amount_required: TokenAmount(1000),
             asset: principal,
             pay_to: principal,

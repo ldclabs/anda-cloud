@@ -17,7 +17,7 @@ app.use(
             decimals: 8,
           },
         },
-        network: "icp-ogkpr-lyaaa-aaaap-an5fq-cai",
+        network: "icp",
       },
     },
     {
@@ -139,7 +139,7 @@ servePremiumContent();
             : 'Instant Finality on ICP'}</div
         >
         <pre
-          class="max-h-[420px] overflow-auto p-2 [font-family:ui-monospace,monospace] text-xs leading-relaxed text-white"
+          class="max-h-[420px] overflow-auto p-2 font-[ui-monospace,monospace] text-xs leading-relaxed text-white"
           ><code
             >{tab === 'server' ? serverExample : settlementExample}</code
           ></pre
