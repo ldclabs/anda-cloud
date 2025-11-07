@@ -82,7 +82,7 @@ async function main() {
   }
 
   // Client: build x402 request
-  const x402Request = await x402.buildX402Request(req, assetId)
+  const x402Request = await x402.buildX402RequestFrom(req, assetId)
   console.log(
     `\nTipping ${formatAmount(amount, selectedAssetInfo.decimals)} ${selectedAssetInfo.symbol} to https://dmsg.net/PANDA wallet (${payTo})`
   )

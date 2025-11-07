@@ -1,6 +1,6 @@
 {
   "name": "@ldclabs/anda_x402",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "type": "module",
   "description": "The Typescript version of the client SDK for the Anda x402.",
   "license": "MIT",

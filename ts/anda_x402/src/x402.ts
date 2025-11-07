@@ -14,6 +14,7 @@ import type {
   TokenInfo,
   IcpPayloadAuthorization,
   PaymentRequirementsResponse,
+  PaymentRequirements,
   X402Request,
   PaymentPayload
 } from './types.js'
@@ -78,7 +79,7 @@ export class X402Canister {
     return bytesToBase64Url(deterministicEncode(sig))
   }
 
-  async buildX402Request(
+  async buildX402RequestFrom(
     res: PaymentRequirementsResponse,
     asset: string
   ): Promise<X402Request> {
@@ -120,6 +121,61 @@ export class X402Canister {
     }
 
     throw new Error(`Asset ${asset} not accepted`)
+  }
+
+  async buildX402Request(
+    req: PaymentRequirements,
+    x402Version: number
+  ): Promise<X402Request> {
+    if (req.network != this.network) {
+      throw new Error(
+        `Network ${req.network} not supported by Anda x402 facilitator`
+      )
+    }
+
+    const [info, nonce] = await Promise.all([this.getInfo(), this.nextNonce()])
+    const supportedPayment = info.supportedPayments.find(
+      (sp) =>
+        sp.network === req.network &&
+        sp.scheme === req.scheme &&
+        sp.x402Version === x402Version
+    )
+
+    if (!supportedPayment) {
+      throw new Error(
+        `Payment scheme ${req.scheme} not supported by Anda x402 facilitator`
+      )
+    }
+
+    if (!info.supportedAssets[req.asset]) {
+      throw new Error(
+        `Asset ${req.asset} not supported by Anda x402 facilitator`
+      )
+    }
+
+    const now = Math.floor(Date.now() / 1000)
+    const authorization: IcpPayloadAuthorization = {
+      scheme: req.scheme,
+      asset: req.asset,
+      to: req.payTo,
+      value: req.maxAmountRequired,
+      expiresAt: (now + req.maxTimeoutSeconds) * 1000,
+      nonce: nonce
+    }
+    const signature = await this.signPayload(authorization)
+
+    return {
+      paymentPayload: {
+        x402Version,
+        scheme: req.scheme,
+        network: req.network,
+        payload: {
+          signature,
+          authorization
+        }
+      },
+      paymentRequirements: req
+    }
   }
 
   async getInfo(): Promise<StateInfo> {

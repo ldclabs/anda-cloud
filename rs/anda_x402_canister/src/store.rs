@@ -24,7 +24,7 @@ const CLOCK_SKEW_MS: u64 = 1000 * 60; // 1 minute
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
-#[derive(Clone, CandidType, Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub struct State {
     pub name: String, // facilitator name
     #[serde(default)]
@@ -34,6 +34,48 @@ pub struct State {
     pub total_collected_fees: BTreeMap<Principal, u128>,
     pub total_withdrawn_fees: BTreeMap<Principal, u128>,
     pub governance_canister: Option<Principal>,
+}
+
+#[derive(Clone, CandidType, Default, Deserialize, Serialize)]
+pub struct StateInfo {
+    pub name: String, // facilitator name
+    #[serde(default)]
+    pub key_name: String,
+    pub supported_payments: BTreeSet<SupportedPaymentKind>,
+    pub supported_assets: BTreeMap<Principal, AssetInfo>,
+    pub total_collected_fees: BTreeMap<Principal, u128>,
+    pub total_withdrawn_fees: BTreeMap<Principal, u128>,
+    pub governance_canister: Option<Principal>,
+}
+
+impl From<&State> for StateInfo {
+    fn from(state: &State) -> Self {
+        StateInfo {
+            name: state.name.clone(),
+            key_name: state.key_name.clone(),
+            supported_payments: state.supported_payments.clone(),
+            supported_assets: state
+                .supported_assets
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        *k,
+                        AssetInfo {
+                            name: v.name.clone(),
+                            symbol: v.symbol.clone(),
+                            decimals: v.decimals,
+                            transfer_fee: v.transfer_fee,
+                            payment_fee: v.payment_fee,
+                            logo: None, // do not expose logo in info, reduce data size
+                        },
+                    )
+                })
+                .collect(),
+            total_collected_fees: state.total_collected_fees.clone(),
+            total_withdrawn_fees: state.total_withdrawn_fees.clone(),
+            governance_canister: state.governance_canister,
+        }
+    }
 }
 
 #[derive(Clone, CandidType, Default, Deserialize, Serialize)]
@@ -271,8 +313,8 @@ pub mod state {
         });
     }
 
-    pub fn info() -> State {
-        with(|s| s.clone())
+    pub fn info() -> StateInfo {
+        with(|s| s.into())
     }
 
     pub fn supported() -> SupportedPaymentKindsResponse {

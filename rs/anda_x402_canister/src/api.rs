@@ -1,7 +1,7 @@
 use crate::{helper::msg_caller, store};
 
 #[ic_cdk::query]
-fn info() -> Result<store::State, String> {
+fn info() -> Result<store::StateInfo, String> {
     Ok(store::state::info())
 }
 
