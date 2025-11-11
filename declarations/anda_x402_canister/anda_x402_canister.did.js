@@ -11,10 +11,10 @@ export const idlFactory = ({ IDL }) => {
     'Upgrade' : UpgradeArgs,
     'Init' : InitArgs,
   });
-  const X402Version = IDL.Variant({ 'V1' : IDL.Null });
-  const Scheme = IDL.Variant({ 'Exact' : IDL.Null, 'Upto' : IDL.Null });
   const Result = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
   const Result_1 = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : IDL.Text });
+  const Scheme = IDL.Variant({ 'Exact' : IDL.Null, 'Upto' : IDL.Null });
+  const X402Version = IDL.Variant({ 'V1' : IDL.Null });
   const SupportedPaymentKind = IDL.Record({
     'scheme' : Scheme,
     'network' : IDL.Text,
@@ -28,7 +28,7 @@ export const idlFactory = ({ IDL }) => {
     'payment_fee' : IDL.Nat,
     'symbol' : IDL.Text,
   });
-  const State = IDL.Record({
+  const StateInfo = IDL.Record({
     'total_withdrawn_fees' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
     'supported_payments' : IDL.Vec(SupportedPaymentKind),
     'total_collected_fees' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
@@ -37,7 +37,7 @@ export const idlFactory = ({ IDL }) => {
     'supported_assets' : IDL.Vec(IDL.Tuple(IDL.Principal, AssetInfo)),
     'key_name' : IDL.Text,
   });
-  const Result_2 = IDL.Variant({ 'Ok' : State, 'Err' : IDL.Text });
+  const Result_2 = IDL.Variant({ 'Ok' : StateInfo, 'Err' : IDL.Text });
   const PayerStateInfo = IDL.Record({
     'next_nonce' : IDL.Nat64,
     'logs' : IDL.Vec(IDL.Nat64),
@@ -64,7 +64,7 @@ export const idlFactory = ({ IDL }) => {
   const Result_6 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
   return IDL.Service({
     'admin_add_supported_payment' : IDL.Func(
-        [X402Version, Scheme],
+        [IDL.Nat8, IDL.Text],
         [Result],
         [],
       ),
@@ -75,7 +75,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'admin_remove_supported_asset' : IDL.Func([IDL.Principal], [Result], []),
     'admin_remove_supported_payment' : IDL.Func(
-        [X402Version, Scheme],
+        [IDL.Nat8, IDL.Text],
         [Result],
         [],
       ),
@@ -93,7 +93,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'next_nonce' : IDL.Func([], [Result_5], ['query']),
     'validate_admin_add_supported_payment' : IDL.Func(
-        [X402Version, Scheme],
+        [IDL.Nat8, IDL.Text],
         [Result_6],
         [],
       ),
@@ -103,7 +103,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'validate_admin_remove_supported_payment' : IDL.Func(
-        [X402Version, Scheme],
+        [IDL.Nat8, IDL.Text],
         [Result_6],
         [],
       ),

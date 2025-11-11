@@ -27,13 +27,13 @@ type PaymentLogInfo = record {
 };
 type Result = variant { Ok; Err : text };
 type Result_1 = variant { Ok : nat; Err : text };
-type Result_2 = variant { Ok : State; Err : text };
+type Result_2 = variant { Ok : StateInfo; Err : text };
 type Result_3 = variant { Ok : PayerStateInfo; Err : text };
 type Result_4 = variant { Ok : vec PaymentLogInfo; Err : text };
 type Result_5 = variant { Ok : nat64; Err : text };
 type Result_6 = variant { Ok : text; Err : text };
 type Scheme = variant { Exact; Upto };
-type State = record {
+type StateInfo = record {
   total_withdrawn_fees : vec record { principal; nat };
   supported_payments : vec SupportedPaymentKind;
   total_collected_fees : vec record { principal; nat };
@@ -53,18 +53,18 @@ type UpgradeArgs = record {
 };
 type X402Version = variant { V1 };
 service : (opt CanisterArgs) -> {
-  admin_add_supported_payment : (X402Version, Scheme) -> (Result);
+  admin_add_supported_payment : (nat8, text) -> (Result);
   admin_collect_fees : (principal, principal, nat) -> (Result_1);
   admin_remove_supported_asset : (principal) -> (Result);
-  admin_remove_supported_payment : (X402Version, Scheme) -> (Result);
+  admin_remove_supported_payment : (nat8, text) -> (Result);
   admin_update_supported_asset : (principal, nat) -> (Result);
   info : () -> (Result_2) query;
   my_info : () -> (Result_3) query;
   my_payment_logs : (nat32, opt nat64) -> (Result_4) query;
   next_nonce : () -> (Result_5) query;
-  validate_admin_add_supported_payment : (X402Version, Scheme) -> (Result_6);
+  validate_admin_add_supported_payment : (nat8, text) -> (Result_6);
   validate_admin_collect_fees : (principal, principal, nat) -> (Result_6);
-  validate_admin_remove_supported_payment : (X402Version, Scheme) -> (Result_6);
+  validate_admin_remove_supported_payment : (nat8, text) -> (Result_6);
   validate_admin_update_supported_asset : (principal, nat) -> (Result_6);
   validate_remove_update_supported_asset : (principal) -> (Result_6);
 }

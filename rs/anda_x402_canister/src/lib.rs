@@ -1,4 +1,3 @@
-use anda_cloud_cdk::x402::{Scheme, X402Version};
 use candid::{Nat, Principal};
 
 use crate::api_init::CanisterArgs;

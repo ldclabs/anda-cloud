@@ -1,6 +1,7 @@
 use anda_cloud_cdk::x402::{Scheme, SupportedPaymentKind, X402Version};
 use candid::{Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
+use std::str::FromStr;
 
 use crate::{
     helper::{pretty_format, token_info, transfer_token_to},
@@ -8,14 +9,14 @@ use crate::{
 };
 
 #[ic_cdk::update(guard = "is_controller")]
-fn admin_add_supported_payment(x402_version: X402Version, scheme: Scheme) -> Result<(), String> {
+fn admin_add_supported_payment(x402_version: u8, scheme: String) -> Result<(), String> {
     let payment = SupportedPaymentKind {
-        x402_version,
-        scheme,
+        x402_version: X402Version::try_from(x402_version).map_err(|err| err.to_string())?,
+        scheme: Scheme::from_str(&scheme).map_err(|err| err.to_string())?,
         network: "icp".to_string(),
     };
 
-    if scheme == Scheme::Upto {
+    if payment.scheme == Scheme::Upto {
         return Err("Scheme::Upto is not supported".to_string());
     }
     store::state::with_mut(|s| {
@@ -26,10 +27,10 @@ fn admin_add_supported_payment(x402_version: X402Version, scheme: Scheme) -> Res
 
 #[ic_cdk::update]
 fn validate_admin_add_supported_payment(
-    x402_version: X402Version,
-    scheme: Scheme,
+    x402_version: u8,
+    scheme: String,
 ) -> Result<String, String> {
-    if scheme == Scheme::Upto {
+    if scheme == Scheme::Upto.to_string() {
         return Err("Scheme::Upto is not supported".to_string());
     }
 
@@ -37,22 +38,20 @@ fn validate_admin_add_supported_payment(
 }
 
 #[ic_cdk::update(guard = "is_controller")]
-fn admin_remove_supported_payment(x402_version: X402Version, scheme: Scheme) -> Result<(), String> {
-    let payment = SupportedPaymentKind {
-        x402_version,
-        scheme,
-        network: "icp".to_string(),
-    };
+fn admin_remove_supported_payment(x402_version: u8, scheme: String) -> Result<(), String> {
+    let x402_version = X402Version::try_from(x402_version).map_err(|err| err.to_string())?;
+    let scheme = Scheme::from_str(&scheme).map_err(|err| err.to_string())?;
     store::state::with_mut(|s| {
-        s.supported_payments.retain(|p| p != &payment);
+        s.supported_payments
+            .retain(|p| p.x402_version != x402_version || p.scheme != scheme);
         Ok(())
     })
 }
 
 #[ic_cdk::update]
 fn validate_admin_remove_supported_payment(
-    x402_version: X402Version,
-    scheme: Scheme,
+    x402_version: u8,
+    scheme: String,
 ) -> Result<String, String> {
     pretty_format(&(x402_version, scheme))
 }
