@@ -137,10 +137,6 @@ export interface IcpPayload {
 }
 
 export interface IcpPayloadAuthorization {
-  /// Payment scheme identifier
-  scheme: 'exact' | 'upto'
-  /// token ledger canister address
-  asset: string
   /// Recipient's wallet address
   to: string
   /// Payment amount in atomic units.

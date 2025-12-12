@@ -217,9 +217,7 @@ async fn post_verify(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
     let res = match req {
         Ok(payer) => VerifyResponse::valid(payer.to_string()),
         Err((err, maybe_payer)) => {
-            let payer_str = maybe_payer
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| "".to_string());
+            let payer_str = maybe_payer.map(|p| p.to_string());
             VerifyResponse::invalid(payer_str, err)
         }
     };
@@ -250,18 +248,16 @@ async fn post_settle(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
         Ok((payer, transaction)) => SettleResponse {
             success: true,
             error_reason: None,
-            payer: payer.to_string(),
+            payer: Some(payer.to_string()),
             transaction,
             network,
         },
         Err((err, maybe_payer)) => {
-            let payer_str = maybe_payer
-                .map(|p| p.to_string())
-                .unwrap_or_else(|| "".to_string());
+            let payer = maybe_payer.map(|p| p.to_string());
             SettleResponse {
                 success: false,
                 error_reason: Some(err.to_string()),
-                payer: payer_str,
+                payer,
                 transaction: "".to_string(),
                 network,
             }
@@ -303,7 +299,7 @@ async fn verify_payment(
         .payment_payload
         .payload
         .verify_signature(now_ms, Some(canister_self))
-        .map_err(|err| (X402Error::InvalidPayloadAuthorizationSignature(err), None))?;
+        .map_err(|err| (X402Error::InvalidPayloadSignature(err), None))?;
 
     let _ = store::state::verify_payload(payer, &req.payment_payload, now_ms)
         .map_err(|err| (err, Some(payer)))?;
@@ -344,16 +340,16 @@ async fn settle_payment(
         .payment_payload
         .payload
         .verify_signature(now_ms, Some(canister_self))
-        .map_err(|err| (X402Error::InvalidPayloadAuthorizationSignature(err), None))?;
+        .map_err(|err| (X402Error::InvalidPayloadSignature(err), None))?;
 
     let asset_info = store::state::verify_payload(payer, &req.payment_payload, now_ms)
         .map_err(|err| (err, Some(payer)))?;
 
     let log = store::PaymentLog {
-        scheme: req.payment_payload.payload.authorization.scheme,
-        asset: req.payment_requirements.asset,
+        scheme: req.payment_payload.accepted.scheme,
+        asset: req.payment_payload.accepted.asset,
         from: payer,
-        to: req.payment_requirements.pay_to,
+        to: req.payment_payload.accepted.pay_to,
         value: req.payment_payload.payload.authorization.value.0,
         fee: asset_info.payment_fee,
         expires_at: req.payment_payload.payload.authorization.expires_at,

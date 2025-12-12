@@ -1,7 +1,6 @@
-use anda_cloud_cdk::x402::{Scheme, SupportedPaymentKind, X402Version};
+use anda_cloud_cdk::x402::SupportedKind;
 use candid::{CandidType, Principal};
 use serde::Deserialize;
-use std::collections::BTreeSet;
 
 use crate::store;
 
@@ -28,13 +27,12 @@ fn init(args: Option<CanisterArgs>) {
     if let Some(CanisterArgs::Init(args)) = args {
         store::state::with_mut(|s| {
             s.name = args.name;
-
-            let network = "icp".to_string();
-            s.supported_payments = BTreeSet::from([SupportedPaymentKind {
-                x402_version: X402Version::V1,
-                scheme: Scheme::Exact,
-                network,
-            }]);
+            s.supported_payments = vec![SupportedKind {
+                x402_version: 2,
+                scheme: "exact".to_string(),
+                network: "icp:mainnet".to_string(),
+                extra: None,
+            }];
             s.governance_canister = args.governance_canister;
         });
     } else if let Some(CanisterArgs::Upgrade(_)) = args {

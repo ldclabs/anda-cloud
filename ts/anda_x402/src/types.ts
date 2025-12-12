@@ -3,39 +3,49 @@ import { Principal } from '@dfinity/principal'
 export interface PaymentRequirements {
   /// Payment scheme identifier (e.g., "exact")
   scheme: 'exact' | 'upto'
-  /// Blockchain network identifier (e.g., "icp")
+  /// Blockchain network identifier (e.g., "icp:mainnet")
   network: string
   /// Required payment amount in atomic token units
-  maxAmountRequired: string
+  amount: string
   /// Token ledger canister address
   asset: string
   /// Recipient wallet address for the payment
   payTo: string
-  /// the protected resource, e.g., URL of the resource endpoint
-  resource: string
-  /// Human-readable description of the resource
-  description: string
-  /// MIME type of the expected response
-  mimeType?: string
-  /// JSON schema describing the response format
-  outputSchema?: object
   /// Maximum time allowed for payment completion in seconds
   maxTimeoutSeconds: number
   /// Scheme-specific additional information.
-  extra?: object
+  extra?: Record<string, unknown>
 }
 
-export interface PaymentRequirementsResponse {
+export interface ResourceInfo {
+  /// the protected resource, e.g., URL of the resource endpoint
+  url: string
+  /// Human-readable description of the resource
+  description?: string
+  /// MIME type of the expected response
+  mimeType?: string
+}
+
+///  Describes additional extension data for x402 payment.
+export interface Extensions {
+  info: Record<string, unknown>
+  schema: Record<string, unknown>
+}
+
+export interface PaymentRequired {
   x402Version: number
-  error: string
+  error?: string
+  resource: ResourceInfo
   accepts: PaymentRequirements[]
+  extensions?: Extensions
 }
 
-export interface PaymentPayload {
+export interface PaymentPayload<T> {
   x402Version: number
-  scheme: string
-  network: string
-  payload: object
+  resource?: ResourceInfo
+  accepted: PaymentRequirements
+  payload: T
+  extensions?: Extensions
 }
 
 export interface IcpPayload {
@@ -46,10 +56,6 @@ export interface IcpPayload {
 }
 
 export interface IcpPayloadAuthorization {
-  /// Payment scheme identifier
-  scheme: 'exact' | 'upto'
-  /// ICRC2 token ledger canister address
-  asset: string
   /// Recipient's wallet address
   to: string
   /// Payment amount in atomic units.
@@ -62,14 +68,14 @@ export interface IcpPayloadAuthorization {
   nonce: number
 }
 
-export interface X402Request {
-  paymentPayload: PaymentPayload
+export interface X402Request<T> {
+  paymentPayload: PaymentPayload<T>
   paymentRequirements: PaymentRequirements
 }
 
 export interface VerifyResponse {
   isValid: boolean
-  payer: string
+  payer?: string
   invalidReason?: string
 }
 
@@ -78,13 +84,14 @@ export interface SettleResponse {
   errorReason?: string
   transaction: string
   network: string
-  payer: string
+  payer?: string
 }
 
-export interface SupportedPaymentKind {
+export interface SupportedKind {
+  x402Version: number
   scheme: string
   network: string
-  x402Version: number
+  extra?: Record<string, unknown>
 }
 
 export interface AssetInfo {
@@ -118,21 +125,9 @@ export interface TokenInfo {
   canisterId: Principal
 }
 
-/// Parses a transaction string in the format "log_id:asset_canister:block_idx"
-export function parseTransaction(
-  transaction: string
-): [bigint, Principal, bigint] {
-  const parts = transaction.split(':')
-  if (parts.length === 3) {
-    return [BigInt(parts[0]), Principal.fromText(parts[1]), BigInt(parts[2])]
-  }
-
-  throw new Error(`Unsupported transaction format: ${transaction}`)
-}
-
 export interface StateInfo {
   name: string
-  supportedPayments: SupportedPaymentKind[]
+  supportedPayments: SupportedKind[]
   supportedAssets: Record<string, AssetInfo>
   totalWithdrawnFees: Record<string, bigint>
   totalCollectedFees: Record<string, bigint>

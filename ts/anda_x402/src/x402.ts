@@ -1,6 +1,12 @@
-import { Principal } from '@dfinity/principal'
 import { HttpAgent, SignIdentity } from '@dfinity/agent'
-import { DelegationChain, DelegationIdentity } from '@dfinity/identity'
+import { DelegationIdentity } from '@dfinity/identity'
+import { Principal } from '@dfinity/principal'
+import {
+  bytesToBase64Url,
+  deterministicEncode,
+  signMessage,
+  toDelegationIdentity
+} from '@ldclabs/ic-auth'
 import type { _SERVICE } from '../candid/anda_x402_canister/anda_x402_canister.did.js'
 import { createActor } from '../candid/anda_x402_canister/index.js'
 import {
@@ -9,21 +15,15 @@ import {
 } from '../candid/icrc1_ledger_canister/icrc1_ledger_canister.did.js'
 import { createActor as createTokenActor } from '../candid/icrc1_ledger_canister/index.js'
 import type {
-  StateInfo,
-  PaymentLogInfo,
-  TokenInfo,
+  IcpPayload,
   IcpPayloadAuthorization,
-  PaymentRequirementsResponse,
+  PaymentLogInfo,
+  PaymentRequired,
   PaymentRequirements,
-  X402Request,
-  PaymentPayload
+  StateInfo,
+  TokenInfo,
+  X402Request
 } from './types.js'
-import {
-  toDelegationIdentity,
-  signMessage,
-  deterministicEncode,
-  bytesToBase64Url
-} from '@ldclabs/ic-auth'
 
 export {
   Delegation,
@@ -48,7 +48,7 @@ export class X402Canister {
     host?: string
   ) {
     this.canisterId = toPrincipal(canisterId)
-    this.network = `icp`
+    this.network = `icp:mainnet`
     this.endpoint = `https://${this.canisterId.toText()}.icp0.io`
     this.#identity = toDelegationIdentity(identity)
 
@@ -80,9 +80,9 @@ export class X402Canister {
   }
 
   async buildX402RequestFrom(
-    res: PaymentRequirementsResponse,
+    res: PaymentRequired,
     asset: string
-  ): Promise<X402Request> {
+  ): Promise<X402Request<IcpPayload>> {
     for (const req of res.accepts) {
       if (req.network == this.network && req.asset === asset) {
         const [info, nonce] = await Promise.all([
@@ -96,10 +96,8 @@ export class X402Canister {
 
         const now = Math.floor(Date.now() / 1000)
         const authorization: IcpPayloadAuthorization = {
-          scheme: req.scheme,
-          asset: req.asset,
           to: req.payTo,
-          value: req.maxAmountRequired,
+          value: req.amount,
           expiresAt: (now + req.maxTimeoutSeconds) * 1000,
           nonce: nonce
         }
@@ -108,8 +106,7 @@ export class X402Canister {
         return {
           paymentPayload: {
             x402Version: res.x402Version,
-            scheme: req.scheme,
-            network: req.network,
+            accepted: req,
             payload: {
               signature,
               authorization
@@ -126,7 +123,7 @@ export class X402Canister {
   async buildX402Request(
     req: PaymentRequirements,
     x402Version: number
-  ): Promise<X402Request> {
+  ): Promise<X402Request<IcpPayload>> {
     if (req.network != this.network) {
       throw new Error(
         `Network ${req.network} not supported by Anda x402 facilitator`
@@ -155,10 +152,8 @@ export class X402Canister {
 
     const now = Math.floor(Date.now() / 1000)
     const authorization: IcpPayloadAuthorization = {
-      scheme: req.scheme,
-      asset: req.asset,
       to: req.payTo,
-      value: req.maxAmountRequired,
+      value: req.amount,
       expiresAt: (now + req.maxTimeoutSeconds) * 1000,
       nonce: nonce
     }
@@ -167,8 +162,7 @@ export class X402Canister {
     return {
       paymentPayload: {
         x402Version,
-        scheme: req.scheme,
-        network: req.network,
+        accepted: req,
         payload: {
           signature,
           authorization
@@ -184,9 +178,9 @@ export class X402Canister {
     return {
       name: res.name,
       supportedPayments: res.supported_payments.map((sp) => ({
-        scheme: 'Exact' in sp.scheme ? 'exact' : 'upto',
+        scheme: sp.scheme,
         network: sp.network,
-        x402Version: 'V1' in sp.x402_version ? 1 : 0
+        x402Version: sp.x402_version
       })),
       supportedAssets: Object.fromEntries(
         res.supported_assets.map(([principal, info]) => [
@@ -229,7 +223,7 @@ export class X402Canister {
       fee: log.fee,
       asset: log.asset.toText(),
       value: log.value,
-      scheme: 'Exact' in log.scheme ? 'exact' : 'upto',
+      scheme: log.scheme,
       from: log.from.toText(),
       nonce: log.nonce,
       timestamp: log.timestamp,

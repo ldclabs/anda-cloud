@@ -13,12 +13,10 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
   const Result_1 = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : IDL.Text });
-  const Scheme = IDL.Variant({ 'Exact' : IDL.Null, 'Upto' : IDL.Null });
-  const X402Version = IDL.Variant({ 'V1' : IDL.Null });
-  const SupportedPaymentKind = IDL.Record({
-    'scheme' : Scheme,
+  const SupportedKindCan = IDL.Record({
+    'scheme' : IDL.Text,
     'network' : IDL.Text,
-    'x402_version' : X402Version,
+    'x402_version' : IDL.Nat8,
   });
   const AssetInfo = IDL.Record({
     'decimals' : IDL.Nat8,
@@ -30,7 +28,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const StateInfo = IDL.Record({
     'total_withdrawn_fees' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
-    'supported_payments' : IDL.Vec(SupportedPaymentKind),
+    'supported_payments' : IDL.Vec(SupportedKindCan),
     'total_collected_fees' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
     'governance_canister' : IDL.Opt(IDL.Principal),
     'name' : IDL.Text,
@@ -50,7 +48,7 @@ export const idlFactory = ({ IDL }) => {
     'fee' : IDL.Text,
     'asset' : IDL.Principal,
     'value' : IDL.Text,
-    'scheme' : Scheme,
+    'scheme' : IDL.Text,
     'from' : IDL.Principal,
     'nonce' : IDL.Nat64,
     'timestamp' : IDL.Nat64,

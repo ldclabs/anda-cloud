@@ -27,7 +27,7 @@ export interface PaymentLogInfo {
   'fee' : string,
   'asset' : Principal,
   'value' : string,
-  'scheme' : Scheme,
+  'scheme' : string,
   'from' : Principal,
   'nonce' : bigint,
   'timestamp' : bigint,
@@ -37,7 +37,7 @@ export type Result = { 'Ok' : null } |
   { 'Err' : string };
 export type Result_1 = { 'Ok' : bigint } |
   { 'Err' : string };
-export type Result_2 = { 'Ok' : State } |
+export type Result_2 = { 'Ok' : StateInfo } |
   { 'Err' : string };
 export type Result_3 = { 'Ok' : PayerStateInfo } |
   { 'Err' : string };
@@ -47,39 +47,36 @@ export type Result_5 = { 'Ok' : bigint } |
   { 'Err' : string };
 export type Result_6 = { 'Ok' : string } |
   { 'Err' : string };
-export type Scheme = { 'Exact' : null } |
-  { 'Upto' : null };
-export interface State {
+export interface StateInfo {
   'total_withdrawn_fees' : Array<[Principal, bigint]>,
-  'supported_payments' : Array<SupportedPaymentKind>,
+  'supported_payments' : Array<SupportedKindCan>,
   'total_collected_fees' : Array<[Principal, bigint]>,
   'governance_canister' : [] | [Principal],
   'name' : string,
   'supported_assets' : Array<[Principal, AssetInfo]>,
   'key_name' : string,
 }
-export interface SupportedPaymentKind {
-  'scheme' : Scheme,
+export interface SupportedKindCan {
+  'scheme' : string,
   'network' : string,
-  'x402_version' : X402Version,
+  'x402_version' : number,
 }
 export interface UpgradeArgs {
   'governance_canister' : [] | [Principal],
   'name' : [] | [string],
 }
-export type X402Version = { 'V1' : null };
 export interface _SERVICE {
-  'admin_add_supported_payment' : ActorMethod<[X402Version, Scheme], Result>,
+  'admin_add_supported_payment' : ActorMethod<[number, string], Result>,
   'admin_collect_fees' : ActorMethod<[Principal, Principal, bigint], Result_1>,
   'admin_remove_supported_asset' : ActorMethod<[Principal], Result>,
-  'admin_remove_supported_payment' : ActorMethod<[X402Version, Scheme], Result>,
+  'admin_remove_supported_payment' : ActorMethod<[number, string], Result>,
   'admin_update_supported_asset' : ActorMethod<[Principal, bigint], Result>,
   'info' : ActorMethod<[], Result_2>,
   'my_info' : ActorMethod<[], Result_3>,
   'my_payment_logs' : ActorMethod<[number, [] | [bigint]], Result_4>,
   'next_nonce' : ActorMethod<[], Result_5>,
   'validate_admin_add_supported_payment' : ActorMethod<
-    [X402Version, Scheme],
+    [number, string],
     Result_6
   >,
   'validate_admin_collect_fees' : ActorMethod<
@@ -87,7 +84,7 @@ export interface _SERVICE {
     Result_6
   >,
   'validate_admin_remove_supported_payment' : ActorMethod<
-    [X402Version, Scheme],
+    [number, string],
     Result_6
   >,
   'validate_admin_update_supported_asset' : ActorMethod<

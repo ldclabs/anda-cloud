@@ -1,6 +1,6 @@
 {
   "name": "@ldclabs/anda_x402",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "The Typescript version of the client SDK for the Anda x402.",
   "license": "MIT",
@@ -33,22 +33,22 @@
     "ncu": "npx npm-check-updates -u"
   },
   "dependencies": {
-    "@ldclabs/ic-auth": "^0.2.0"
+    "@ldclabs/ic-auth": "^0.3.1",
+    "cborg": "^4.3.1"
   },
   "peerDependencies": {
     "@dfinity/agent": ">=3.2.0",
     "@dfinity/candid": ">=3.2.0",
     "@dfinity/identity": ">=3.2.0",
     "@dfinity/principal": ">=3.2.0",
-    "@noble/hashes": ">=1.8.0",
-    "cborg": ">=4.2.0"
+    "@noble/hashes": ">=1.8.0"
   },
   "devDependencies": {
     "@dfinity/agent": ">=3.2.0",
     "@dfinity/identity": ">=3.2.0",
     "@dfinity/principal": ">=3.2.0",
     "@noble/hashes": "^1.8.0",
-    "cborg": ">=4.2.0",
+    "cborg": ">=4.3.0",
     "@types/eslint": "^9.6.1",
     "@types/node": "24.3.0",
     "@typescript-eslint/eslint-plugin": "^8.42.0",

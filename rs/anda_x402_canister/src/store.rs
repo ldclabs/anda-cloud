@@ -29,7 +29,7 @@ pub struct State {
     pub name: String, // facilitator name
     #[serde(default)]
     pub key_name: String,
-    pub supported_payments: BTreeSet<SupportedPaymentKind>,
+    pub supported_payments: Vec<SupportedKind>,
     pub supported_assets: BTreeMap<Principal, AssetInfo>,
     pub total_collected_fees: BTreeMap<Principal, u128>,
     pub total_withdrawn_fees: BTreeMap<Principal, u128>,
@@ -41,7 +41,7 @@ pub struct StateInfo {
     pub name: String, // facilitator name
     #[serde(default)]
     pub key_name: String,
-    pub supported_payments: BTreeSet<SupportedPaymentKind>,
+    pub supported_payments: Vec<SupportedKindCan>,
     pub supported_assets: BTreeMap<Principal, AssetInfo>,
     pub total_collected_fees: BTreeMap<Principal, u128>,
     pub total_withdrawn_fees: BTreeMap<Principal, u128>,
@@ -53,7 +53,7 @@ impl From<&State> for StateInfo {
         StateInfo {
             name: state.name.clone(),
             key_name: state.key_name.clone(),
-            supported_payments: state.supported_payments.clone(),
+            supported_payments: state.supported_payments.iter().map(|k| k.into()).collect(),
             supported_assets: state
                 .supported_assets
                 .iter()
@@ -130,7 +130,7 @@ impl From<PayerState> for PayerStateInfo {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PaymentLog {
     #[serde(rename = "s")]
-    pub scheme: Scheme,
+    pub scheme: String,
     #[serde(rename = "a")]
     pub asset: Principal,
     #[serde(rename = "f")]
@@ -153,7 +153,7 @@ pub struct PaymentLog {
 #[serde(rename_all = "camelCase")]
 pub struct PaymentLogInfo {
     pub id: u64,
-    pub scheme: Scheme,
+    pub scheme: String,
     pub asset: Principal,
     pub from: Principal,
     pub to: Principal,
@@ -317,9 +317,11 @@ pub mod state {
         with(|s| s.into())
     }
 
-    pub fn supported() -> SupportedPaymentKindsResponse {
-        with(|state| SupportedPaymentKindsResponse {
+    pub fn supported() -> SupportedResponse {
+        with(|state| SupportedResponse {
             kinds: state.supported_payments.clone().into_iter().collect(),
+            extensions: vec![],
+            signers: BTreeMap::new(),
         })
     }
 
@@ -374,6 +376,13 @@ pub mod state {
         payload: &PaymentPayload,
         now_ms: u64,
     ) -> Result<AssetInfo, X402Error> {
+        if payload.accepted.network != "icp:mainnet" {
+            return Err(X402Error::InvalidNetwork(format!(
+                "{}, expected: icp:mainnet",
+                payload.accepted.network
+            )));
+        }
+
         if payload.payload.authorization.expires_at < now_ms + CLOCK_SKEW_MS {
             return Err(X402Error::InvalidPayload(format!(
                 "Expired authorization: {}, current time: {}",
@@ -382,36 +391,31 @@ pub mod state {
         }
 
         let asset_info = with(|state| {
-            if &payload.network != "icp" {
-                return Err(X402Error::InvalidNetwork(format!(
-                    "{}, expected: icp",
-                    payload.network
-                )));
-            }
-
             let supported_payments = state
                 .supported_payments
                 .iter()
-                .filter(|kind| kind.x402_version == payload.x402_version)
-                .collect::<Vec<&SupportedPaymentKind>>();
+                .filter(|&kind| kind.x402_version == payload.x402_version)
+                .collect::<Vec<&SupportedKind>>();
             if supported_payments.is_empty() {
-                return Err(X402Error::InvalidX402Version(payload.x402_version.into()));
+                return Err(X402Error::InvalidX402Version(payload.x402_version));
             }
             if !supported_payments
                 .iter()
-                .any(|&kind| kind.scheme == payload.scheme)
+                .any(|&kind| kind.scheme == payload.accepted.scheme)
             {
-                return Err(X402Error::UnsupportedScheme(payload.scheme.to_string()));
+                return Err(X402Error::UnsupportedScheme(
+                    payload.accepted.scheme.to_string(),
+                ));
             }
 
             let asset_info = state
                 .supported_assets
-                .get(&payload.payload.authorization.asset)
+                .get(&payload.accepted.asset)
                 .cloned()
                 .ok_or_else(|| {
-                    X402Error::InvalidPayloadAuthorizationValidAsset(format!(
+                    X402Error::InvalidPaymentRequirements(format!(
                         "Unsupported asset: {}",
-                        payload.payload.authorization.asset
+                        payload.accepted.asset
                     ))
                 })?;
             if payload.payload.authorization.value.0 <= asset_info.payment_fee {

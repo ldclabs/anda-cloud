@@ -1,4 +1,4 @@
-import { X402Canister, PaymentRequirementsResponse } from '@ldclabs/anda_x402'
+import { X402Canister, PaymentRequired } from '@ldclabs/anda_x402'
 import { Ed25519KeyIdentity } from '@ldclabs/ic-auth'
 import assert from 'node:assert'
 
@@ -21,18 +21,19 @@ async function main() {
   const before = await x402.getBalanceOf(assetId, payTo)
   console.log('Balance:', before)
 
-  const req: PaymentRequirementsResponse = {
-    x402Version: 1,
+  const req: PaymentRequired = {
+    x402Version: 2,
     error: 'some error',
+    resource: {
+      url: 'https://anda.ai',
+    },
     accepts: [
       {
         scheme: 'exact',
         network: x402.network,
-        maxAmountRequired: '100000000', // 1 PANDA
+        amount: '100000000', // 1 PANDA
         asset: assetId,
         payTo,
-        resource: 'https://anda.ai',
-        description: 'Payment for some resource',
         maxTimeoutSeconds: 300
       }
     ]
@@ -42,7 +43,7 @@ async function main() {
   await x402.ensureAllowance(assetId, BigInt(100000000 + 10000)) // 1 PANDA + fee
 
   // Client: build x402 request
-  const x402Request = await x402.buildX402Request(req, assetId)
+  const x402Request = await x402.buildX402Request(req.accepts[0], 2)
   console.log('\n\nX402 Request:', x402Request)
 
   // Resource server: verify x402 request

@@ -26,7 +26,7 @@ A fully on-chain x402 payment facilitator deployed as an ICP smart contract.
 
 **Key Features**:
 
-- Implements the x402 payment protocol for decentralized payments.
+- Implements the x402 payment protocol v2 for decentralized payments.
 - Supports multiple ICRC-2 compatible tokens as payment assets.
 - Manages payment states, fees, and transaction logs on-chain.
 - Fully deployed as a smart contract on the decentralized ICP blockchain, governed by ICPanda DAO.

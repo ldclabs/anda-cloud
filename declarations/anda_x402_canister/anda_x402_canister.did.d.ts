@@ -27,7 +27,7 @@ export interface PaymentLogInfo {
   'fee' : string,
   'asset' : Principal,
   'value' : string,
-  'scheme' : Scheme,
+  'scheme' : string,
   'from' : Principal,
   'nonce' : bigint,
   'timestamp' : bigint,
@@ -47,27 +47,24 @@ export type Result_5 = { 'Ok' : bigint } |
   { 'Err' : string };
 export type Result_6 = { 'Ok' : string } |
   { 'Err' : string };
-export type Scheme = { 'Exact' : null } |
-  { 'Upto' : null };
 export interface StateInfo {
   'total_withdrawn_fees' : Array<[Principal, bigint]>,
-  'supported_payments' : Array<SupportedPaymentKind>,
+  'supported_payments' : Array<SupportedKindCan>,
   'total_collected_fees' : Array<[Principal, bigint]>,
   'governance_canister' : [] | [Principal],
   'name' : string,
   'supported_assets' : Array<[Principal, AssetInfo]>,
   'key_name' : string,
 }
-export interface SupportedPaymentKind {
-  'scheme' : Scheme,
+export interface SupportedKindCan {
+  'scheme' : string,
   'network' : string,
-  'x402_version' : X402Version,
+  'x402_version' : number,
 }
 export interface UpgradeArgs {
   'governance_canister' : [] | [Principal],
   'name' : [] | [string],
 }
-export type X402Version = { 'V1' : null };
 export interface _SERVICE {
   'admin_add_supported_payment' : ActorMethod<[number, string], Result>,
   'admin_collect_fees' : ActorMethod<[Principal, Principal, bigint], Result_1>,

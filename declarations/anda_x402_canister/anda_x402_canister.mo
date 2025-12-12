@@ -23,7 +23,7 @@ module {
     fee : Text;
     asset : Principal;
     value : Text;
-    scheme : Scheme;
+    scheme : Text;
     from : Principal;
     nonce : Nat64;
     timestamp : Nat64;
@@ -36,23 +36,21 @@ module {
   public type Result_4 = { #Ok : [PaymentLogInfo]; #Err : Text };
   public type Result_5 = { #Ok : Nat64; #Err : Text };
   public type Result_6 = { #Ok : Text; #Err : Text };
-  public type Scheme = { #Exact; #Upto };
   public type StateInfo = {
     total_withdrawn_fees : [(Principal, Nat)];
-    supported_payments : [SupportedPaymentKind];
+    supported_payments : [SupportedKindCan];
     total_collected_fees : [(Principal, Nat)];
     governance_canister : ?Principal;
     name : Text;
     supported_assets : [(Principal, AssetInfo)];
     key_name : Text;
   };
-  public type SupportedPaymentKind = {
-    scheme : Scheme;
+  public type SupportedKindCan = {
+    scheme : Text;
     network : Text;
-    x402_version : X402Version;
+    x402_version : Nat8;
   };
   public type UpgradeArgs = { governance_canister : ?Principal; name : ?Text };
-  public type X402Version = { #V1 };
   public type Self = ?CanisterArgs -> async actor {
     admin_add_supported_payment : shared (Nat8, Text) -> async Result;
     admin_collect_fees : shared (Principal, Principal, Nat) -> async Result_1;

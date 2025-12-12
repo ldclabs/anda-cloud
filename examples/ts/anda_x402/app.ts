@@ -1,6 +1,6 @@
 import {
   X402Canister,
-  PaymentRequirementsResponse,
+  PaymentRequired,
   formatAmount
 } from '@ldclabs/anda_x402'
 import { Ed25519KeyIdentity } from '@ldclabs/ic-auth'
@@ -64,18 +64,19 @@ async function main() {
   // https://dmsg.net/PANDA wallet
   const payTo =
     '77ibd-jp5kr-moeco-kgoar-rro5v-5tng4-krif5-5h2i6-osf2f-2sjtv-kqe'
-  const req: PaymentRequirementsResponse = {
-    x402Version: 1,
+  const req: PaymentRequired = {
+    x402Version: 2,
     error: 'some error',
+    resource: {
+      url: 'https://anda.ai',
+    },
     accepts: [
       {
         scheme: 'exact',
-        network: x402.network,
-        maxAmountRequired: amount.toString(),
+        network: 'icp:mainnet',
+        amount: amount.toString(),
         asset: assetId,
         payTo,
-        resource: 'https://anda.ai',
-        description: 'Payment for some resource',
         maxTimeoutSeconds: 300
       }
     ]
@@ -142,8 +143,8 @@ async function main() {
 
   // Settle Response: {
   //   success: true,
-  //   transaction: '3:druyg-tyaaa-aaaaq-aactq-cai:30',
-  //   network: 'icp-ogkpr-lyaaa-aaaap-an5fq-cai',
+  //   transaction: '30',
+  //   network: 'icp:mainnet',
   //   payer: 'jjn6g-sh75l-r3cxb-wxrkl-frqld-6p6qq-d4ato-wske5-op7s5-n566f-bqe'
   // }
 

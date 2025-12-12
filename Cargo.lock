@@ -37,7 +37,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "anda_cloud_cdk"
-version = "0.3.7"
+version = "0.4.0"
 dependencies = [
  "candid",
  "ciborium",
@@ -53,7 +53,7 @@ dependencies = [
 
 [[package]]
 name = "anda_registry_canister"
-version = "0.3.7"
+version = "0.4.0"
 dependencies = [
  "anda_cloud_cdk",
  "base64 0.22.1",
@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "anda_x402_canister"
-version = "0.3.7"
+version = "0.4.0"
 dependencies = [
  "anda_cloud_cdk",
  "base64 0.22.1",

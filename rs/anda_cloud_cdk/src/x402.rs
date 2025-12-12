@@ -1,15 +1,18 @@
 //! Type definitions for the x402 protocol.
 //!
-//! https://github.com/coinbase/x402/blob/main/specs/x402-specification.md
+//! https://github.com/coinbase/x402/blob/main/specs/x402-specification-v2.md
 
 use candid::{CandidType, Principal};
 use ic_auth_types::ByteBufB64;
 use ic_auth_types::deterministic_cbor_into_vec;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::BTreeMap;
 use std::{
     fmt::{self, Debug, Display, Formatter},
     str::FromStr,
 };
+
+pub use serde_json::{Map, Value};
 
 use crate::{SignedEnvelope, sha3_256};
 
@@ -17,124 +20,74 @@ use crate::{SignedEnvelope, sha3_256};
 #[non_exhaustive]
 pub enum X402Error {
     /// Client does not have enough tokens to complete the payment
-    #[error("InsufficientFunds: {0}")]
+    #[error("insufficient_funds: {0}")]
     InsufficientFunds(String),
 
-    /// Payment authorization is not yet valid (before validAfter timestamp)
-    #[error("InvalidPayloadAuthorizationValidAsset: {0}")]
-    InvalidPayloadAuthorizationValidAsset(String),
-
     /// Payment amount is not matching the required amount
-    #[error("InvalidPayloadAuthorizationValue: {0}")]
+    #[error("invalid_payload_authorization_value: {0}")]
     InvalidPayloadAuthorizationValue(String),
 
     /// Payment authorization signature is invalid or improperly signed
-    #[error("InvalidPayloadAuthorizationSignature: {0}")]
-    InvalidPayloadAuthorizationSignature(String),
+    #[error("invalid_payload_signature: {0}")]
+    InvalidPayloadSignature(String),
 
     /// Recipient address does not match payment requirements
-    #[error("InvalidPayloadRecipientMismatch: {0}")]
+    #[error("invalid_payload_recipient_mismatch: {0}")]
     InvalidPayloadRecipientMismatch(String),
 
     /// Specified blockchain network is not supported
-    #[error("InvalidNetwork: {0}")]
+    #[error("invalid_network: {0}")]
     InvalidNetwork(String),
 
     /// Payment payload is malformed or contains invalid data
-    #[error("InvalidPayload: {0}")]
+    #[error("invalid_payload: {0}")]
     InvalidPayload(String),
 
     /// Payment requirements object is invalid or malformed
-    #[error("InvalidPaymentRequirements: {0}")]
+    #[error("invalid_payment_requirements: {0}")]
     InvalidPaymentRequirements(String),
 
     /// Specified payment scheme is not supported
-    #[error("InvalidScheme: {0}")]
+    #[error("invalid_scheme: {0}")]
     InvalidScheme(String),
 
     /// Payment scheme is not supported by the facilitator
-    #[error("UnsupportedScheme: {0}")]
+    #[error("unsupported_scheme: {0}")]
     UnsupportedScheme(String),
 
     /// Protocol version is not supported
-    #[error("InvalidX402Version: {0}")]
+    #[error("invalid_x402_version: {0}")]
     InvalidX402Version(u8),
 
     /// Blockchain transaction failed or was rejected
-    #[error("InvalidTransactionState: {0}")]
+    #[error("invalid_transaction_state: {0}")]
     InvalidTransactionState(String),
 
     /// Unexpected error occurred during payment verification
-    #[error("VerifyError: {0}")]
+    #[error("unexpected_verify_error: {0}")]
     VerifyError(String),
 
     /// Unexpected error occurred during payment settlement
-    #[error("SettleError: {0}")]
+    #[error("unexpected_settle_error: {0}")]
     SettleError(String),
 }
 
-/// PaymentRequirementsResponse Schema
+/// PaymentRequired Schema
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PaymentRequirementsResponse {
+pub struct PaymentRequired {
     /// Protocol version identifier
-    pub x402_version: X402Version,
+    pub x402_version: u8,
     /// Human-readable error message explaining why payment is required
-    pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// ResourceInfo object describing the protected resource
+    pub resource: ResourceInfo,
     /// Array of payment requirement objects defining acceptable payment methods
     pub accepts: Vec<PaymentRequirements>,
-}
-
-/// Protocol version identifier. Currently only version 1 is supported.
-#[derive(CandidType, Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub enum X402Version {
-    /// Version `1`.
-    V1,
-}
-
-impl Display for X402Version {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            X402Version::V1 => write!(f, "1"),
-        }
-    }
-}
-
-impl TryFrom<u8> for X402Version {
-    type Error = X402Error;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            1 => Ok(X402Version::V1),
-            _ => Err(X402Error::InvalidX402Version(value)),
-        }
-    }
-}
-
-impl From<X402Version> for u8 {
-    fn from(version: X402Version) -> Self {
-        match version {
-            X402Version::V1 => 1,
-        }
-    }
-}
-
-impl Serialize for X402Version {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            X402Version::V1 => serializer.serialize_u8(1),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for X402Version {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let num = u8::deserialize(deserializer)?;
-        X402Version::try_from(num).map_err(serde::de::Error::custom)
-    }
+    /// Protocol extensions data
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<Extensions>,
 }
 
 /// Payment requirements set by the payment-gated endpoint for an acceptable payment.
@@ -142,29 +95,43 @@ impl<'de> Deserialize<'de> for X402Version {
 #[serde(rename_all = "camelCase")]
 pub struct PaymentRequirements {
     /// Payment scheme identifier (e.g., "exact")
-    pub scheme: Scheme,
-    /// Blockchain network identifier (e.g., "icp")
+    pub scheme: String,
+    /// Blockchain network identifier (e.g., "icp:mainnet")
     pub network: String,
     /// Required payment amount in atomic token units
-    pub max_amount_required: TokenAmount,
+    pub amount: TokenAmount,
     /// Token ledger canister address
     pub asset: Principal,
     /// Recipient wallet address for the payment
     pub pay_to: Principal,
-    /// the protected resource, e.g., URL of the resource endpoint
-    pub resource: String,
-    /// Human-readable description of the resource
-    pub description: String,
-    /// MIME type of the expected response
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mime_type: Option<String>,
-    /// JSON schema describing the response format
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_schema: Option<serde_json::Value>,
     /// Maximum time allowed for payment completion in seconds
     pub max_timeout_seconds: u64,
     /// Scheme-specific additional information.
-    pub extra: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra: Option<Map<String, Value>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceInfo {
+    /// the protected resource, e.g., URL of the resource endpoint
+    pub url: String,
+    /// Human-readable description of the resource
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// MIME type of the expected response
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+}
+
+/// Describes additional extension data for x402 payment.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Extensions {
+    /// Extension-specific data provided by the server
+    pub info: Map<String, Value>,
+    /// JSON Schema defining the expected structure of `info`
+    pub schema: Map<String, Value>,
 }
 
 /// Describes a signed request to transfer a specific amount of funds on-chain.
@@ -172,13 +139,17 @@ pub struct PaymentRequirements {
 #[serde(rename_all = "camelCase")]
 pub struct PaymentPayload {
     /// Protocol version identifier
-    pub x402_version: X402Version,
-    /// Payment scheme identifier (e.g., "exact")
-    pub scheme: Scheme,
-    /// Blockchain network identifier
-    pub network: String,
-    /// Payment data object
+    pub x402_version: u8,
+    /// ResourceInfo object describing the resource being accessed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource: Option<ResourceInfo>,
+    /// PaymentRequirements object indicating the payment method chosen
+    pub accepted: PaymentRequirements,
+    /// Scheme-specific payment data
     pub payload: IcpPayload,
+    /// Protocol extensions data
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<Extensions>,
 }
 
 /// Scheme-specific payment payload for ICP payments
@@ -209,10 +180,6 @@ impl IcpPayload {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IcpPayloadAuthorization {
-    /// Payment scheme identifier
-    pub scheme: Scheme,
-    /// ICRC2 token ledger canister address
-    pub asset: Principal,
     /// Recipient's wallet address
     pub to: Principal,
     /// Payment amount in atomic units.
@@ -234,8 +201,6 @@ impl IcpPayloadAuthorization {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IcpPayloadAuthorizationRaw {
-    pub scheme: String,
-    pub asset: String,
     pub to: String,
     pub value: String,
     pub expires_at: u64,
@@ -245,9 +210,7 @@ pub struct IcpPayloadAuthorizationRaw {
 impl From<&IcpPayloadAuthorization> for IcpPayloadAuthorizationRaw {
     fn from(auth: &IcpPayloadAuthorization) -> Self {
         IcpPayloadAuthorizationRaw {
-            scheme: auth.scheme.to_string(),
-            asset: auth.asset.to_text(),
-            to: auth.to.to_text(),
+            to: auth.to.to_string(),
             value: auth.value.to_string(),
             expires_at: auth.expires_at,
             nonce: auth.nonce,
@@ -274,30 +237,10 @@ pub struct X402Request {
 impl X402Request {
     /// Constructs a new `X402Request`.
     pub fn validate(&self) -> Result<(), X402Error> {
-        if self.payment_payload.scheme != self.payment_requirements.scheme {
-            return Err(X402Error::UnsupportedScheme(
-                self.payment_payload.scheme.to_string(),
+        if self.payment_payload.accepted != self.payment_requirements {
+            return Err(X402Error::InvalidPaymentRequirements(
+                "Payment payload's accepted requirements do not match the provided payment requirements.".to_string(),
             ));
-        }
-        if self.payment_payload.network != self.payment_requirements.network {
-            return Err(X402Error::InvalidNetwork(format!(
-                "{}, expected: {}",
-                self.payment_payload.network, self.payment_requirements.network
-            )));
-        }
-
-        if self.payment_payload.payload.authorization.scheme != self.payment_payload.scheme {
-            return Err(X402Error::InvalidPayload(format!(
-                "mismatched scheme in payload authorization: {}, expected: {}",
-                self.payment_payload.payload.authorization.scheme, self.payment_payload.scheme,
-            )));
-        }
-
-        if self.payment_payload.payload.authorization.asset != self.payment_requirements.asset {
-            return Err(X402Error::InvalidPayloadAuthorizationValidAsset(format!(
-                "mismatched asset in payload authorization: {}, expected: {}",
-                self.payment_payload.payload.authorization.asset, self.payment_requirements.asset,
-            )));
         }
 
         if self.payment_payload.payload.authorization.to != self.payment_requirements.pay_to {
@@ -307,13 +250,11 @@ impl X402Request {
             )));
         }
 
-        if self.payment_payload.payload.authorization.value.0
-            < self.payment_requirements.max_amount_required.0
+        if self.payment_payload.payload.authorization.value.0 != self.payment_requirements.amount.0
         {
             return Err(X402Error::InvalidPayloadAuthorizationValue(format!(
                 "{}, expected: {}",
-                self.payment_payload.payload.authorization.value,
-                self.payment_requirements.max_amount_required
+                self.payment_payload.payload.authorization.value, self.payment_requirements.amount
             )));
         }
 
@@ -326,7 +267,8 @@ impl X402Request {
 #[serde(rename_all = "camelCase")]
 pub struct VerifyResponse {
     pub is_valid: bool,
-    pub payer: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payer: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub invalid_reason: Option<String>,
 }
@@ -336,13 +278,13 @@ impl VerifyResponse {
     pub fn valid(payer: String) -> Self {
         VerifyResponse {
             is_valid: true,
-            payer,
+            payer: Some(payer),
             invalid_reason: None,
         }
     }
 
     /// Constructs a failed verification response with the given `payer` address and error `reason`.
-    pub fn invalid(payer: String, reason: X402Error) -> Self {
+    pub fn invalid(payer: Option<String>, reason: X402Error) -> Self {
         VerifyResponse {
             is_valid: false,
             payer,
@@ -354,9 +296,8 @@ impl VerifyResponse {
 // {
 //   "success": false,
 //   "errorReason": "insufficient_funds",
-//   "payer": "0x857b06519E91e3A54538791bDbb0E22373e36b66",
 //   "transaction": "",
-//   "network": "base-sepolia"
+//   "network": "icp:mainnet"
 // }
 
 /// Returned from a facilitator after attempting to settle a payment on-chain.
@@ -373,57 +314,8 @@ pub struct SettleResponse {
     /// Blockchain network identifier
     pub network: String,
     /// Address of the payer's wallet
-    pub payer: String,
-}
-
-/// The payment schemes supported by the x402 protocol. Payment schemes define how payments are formed, validated, and settled on specific payment networks. Schemes are independent of the underlying transport mechanism.
-#[derive(Debug, CandidType, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub enum Scheme {
-    /// `exact` transfers a specific amount (ex: pay $1 to read an article)
-    Exact,
-    /// `upto` transfers up to an amount, based on the resources consumed during a request (ex: generating tokens from an LLM)
-    Upto,
-}
-
-impl Display for Scheme {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Scheme::Exact => "exact",
-            Scheme::Upto => "upto",
-        };
-        write!(f, "{s}")
-    }
-}
-
-impl FromStr for Scheme {
-    type Err = X402Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "exact" => Ok(Scheme::Exact),
-            "upto" => Ok(Scheme::Upto),
-            _ => Err(X402Error::InvalidScheme(s.to_string())),
-        }
-    }
-}
-
-impl Serialize for Scheme {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Scheme::Exact => serializer.serialize_str("exact"),
-            Scheme::Upto => serializer.serialize_str("upto"),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for Scheme {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        Scheme::from_str(&s).map_err(serde::de::Error::custom)
-    }
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payer: Option<String>,
 }
 
 /// A precise on-chain token amount in base units (e.g., USDC with 6 decimals).
@@ -463,68 +355,49 @@ impl From<u64> for TokenAmount {
     }
 }
 
-#[derive(Clone, CandidType, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct SupportedPaymentKind {
-    pub x402_version: X402Version,
-    pub scheme: Scheme,
+pub struct SupportedKind {
+    pub x402_version: u8,
+    pub scheme: String,
+    pub network: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra: Option<Map<String, Value>>,
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SupportedKindCan {
+    pub x402_version: u8,
+    pub scheme: String,
     pub network: String,
 }
 
-#[derive(Clone, CandidType, Debug, Serialize, Deserialize)]
+impl From<&SupportedKind> for SupportedKindCan {
+    fn from(kind: &SupportedKind) -> Self {
+        SupportedKindCan {
+            x402_version: kind.x402_version,
+            scheme: kind.scheme.clone(),
+            network: kind.network.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SupportedPaymentKindsResponse {
-    pub kinds: Vec<SupportedPaymentKind>,
+pub struct SupportedResponse {
+    /// Array of supported payment kind objects
+    pub kinds: Vec<SupportedKind>,
+    /// Array of extension identifiers the facilitator has implemented
+    pub extensions: Vec<Extensions>,
+    /// Map of CAIP-2 patterns (e.g., `eip155:*`) to public signer addresses
+    pub signers: BTreeMap<String, Vec<String>>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use candid::Principal;
-    use std::str::FromStr;
-
-    #[test]
-    fn test_x402_version_serialization() {
-        let v1 = X402Version::V1;
-        let serialized = serde_json::to_string(&v1).unwrap();
-        assert_eq!(serialized, "1");
-        let deserialized: X402Version = serde_json::from_str(&serialized).unwrap();
-        assert!(matches!(deserialized, X402Version::V1));
-    }
-
-    #[test]
-    fn test_x402_version_try_from() {
-        assert!(matches!(X402Version::try_from(1), Ok(X402Version::V1)));
-        assert!(matches!(
-            X402Version::try_from(0),
-            Err(X402Error::InvalidX402Version(0))
-        ));
-    }
-
-    #[test]
-    fn test_scheme_serialization() {
-        let exact = Scheme::Exact;
-        let serialized = serde_json::to_string(&exact).unwrap();
-        assert_eq!(serialized, "\"exact\"");
-        let deserialized: Scheme = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized, Scheme::Exact);
-
-        let upto = Scheme::Upto;
-        let serialized = serde_json::to_string(&upto).unwrap();
-        assert_eq!(serialized, "\"upto\"");
-        let deserialized: Scheme = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(deserialized, Scheme::Upto);
-    }
-
-    #[test]
-    fn test_scheme_from_str() {
-        assert_eq!(Scheme::from_str("exact").unwrap(), Scheme::Exact);
-        assert_eq!(Scheme::from_str("upto").unwrap(), Scheme::Upto);
-        assert!(matches!(
-            Scheme::from_str("invalid"),
-            Err(X402Error::InvalidScheme(_))
-        ));
-    }
 
     #[test]
     fn test_token_amount_serialization() {
@@ -539,15 +412,11 @@ mod tests {
     fn test_payment_requirements_serialization() {
         let principal = Principal::from_text("ryjl3-tyaaa-aaaaa-aaaba-cai").unwrap();
         let req = PaymentRequirements {
-            scheme: Scheme::Exact,
-            network: "icp".to_string(),
-            max_amount_required: TokenAmount(1000),
+            scheme: "exact".to_string(),
+            network: "icp:mainnet".to_string(),
+            amount: TokenAmount(1000),
             asset: principal,
             pay_to: principal,
-            resource: "https://example.com".to_string(),
-            description: "Test resource".to_string(),
-            mime_type: None,
-            output_schema: None,
             max_timeout_seconds: 300,
             extra: None,
         };
@@ -562,21 +431,19 @@ mod tests {
         let payer = Principal::anonymous().to_text();
         let valid_response = VerifyResponse::valid(payer.clone());
         assert!(valid_response.is_valid);
-        assert_eq!(valid_response.payer, payer);
+        assert_eq!(valid_response.payer, Some(payer.clone()));
         assert!(valid_response.invalid_reason.is_none());
 
         let reason = X402Error::InsufficientFunds(100.to_string());
-        let invalid_response = VerifyResponse::invalid(payer.clone(), reason.clone());
+        let invalid_response = VerifyResponse::invalid(Some(payer.clone()), reason.clone());
         assert!(!invalid_response.is_valid);
-        assert_eq!(invalid_response.payer, payer);
+        assert_eq!(invalid_response.payer, Some(payer));
         assert_eq!(invalid_response.invalid_reason, Some(reason.to_string()));
     }
 
     #[test]
     fn test_icp_payload_authorization_digest() {
         let auth = IcpPayloadAuthorization {
-            scheme: Scheme::Exact,
-            asset: Principal::from_text("druyg-tyaaa-aaaaq-aactq-cai").unwrap(),
             to: Principal::from_text(
                 "77ibd-jp5kr-moeco-kgoar-rro5v-5tng4-krif5-5h2i6-osf2f-2sjtv-kqe",
             )
@@ -589,10 +456,10 @@ mod tests {
         let data = deterministic_cbor_into_vec(&auth)
             .expect("failed to serialize IcpPayloadAuthorization");
         println!("CBOR Data: {}", hex::encode(&data));
-        // a662746f581dfd5458e209ca338118c5ddaf66d37151417bd3e91e748ba2ea499d55026561737365744a00000000020000a70101656e6f6e6365182a6576616c75656931303030303030303066736368656d65656578616374696578706972657341741b0000019a23bc21f6
+        // a462746f581dfd5458e209ca338118c5ddaf66d37151417bd3e91e748ba2ea499d5502656e6f6e6365182a6576616c756569313030303030303030696578706972657341741b0000019a23bc21f6
 
         let digest = auth.digest();
-        let expected_hex = "14a9c138b21790526a43aa8ca2bb1f0c3618eda2fe02347002cac8f11b255cfc"; // Placeholder
+        let expected_hex = "269d40d6a23a75d9e4935d3010a8b8327115bb3dbadc7c311f43fec2445ae8f9"; // Placeholder
         assert_eq!(hex::encode(digest), expected_hex);
     }
 }

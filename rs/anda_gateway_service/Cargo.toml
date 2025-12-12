@@ -15,7 +15,7 @@ license.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-anda_cloud_cdk = { path = "../anda_cloud_cdk", version = "0.2" }
+anda_cloud_cdk = { path = "../anda_cloud_cdk", version = "0.4" }
 base64 = { workspace = true }
 candid = { workspace = true, features = ["value", "printer"] }
 ciborium = { workspace = true }
