@@ -376,9 +376,9 @@ pub mod state {
         payload: &PaymentPayload,
         now_ms: u64,
     ) -> Result<AssetInfo, X402Error> {
-        if payload.accepted.network != "icp:mainnet" {
+        if payload.accepted.network != "icp:1" {
             return Err(X402Error::InvalidNetwork(format!(
-                "{}, expected: icp:mainnet",
+                "{}, expected: icp:1",
                 payload.accepted.network
             )));
         }

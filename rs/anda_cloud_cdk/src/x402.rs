@@ -96,7 +96,7 @@ pub struct PaymentRequired {
 pub struct PaymentRequirements {
     /// Payment scheme identifier (e.g., "exact")
     pub scheme: String,
-    /// Blockchain network identifier (e.g., "icp:mainnet")
+    /// Blockchain network identifier (e.g., "icp:1")
     pub network: String,
     /// Required payment amount in atomic token units
     pub amount: TokenAmount,
@@ -297,7 +297,7 @@ impl VerifyResponse {
 //   "success": false,
 //   "errorReason": "insufficient_funds",
 //   "transaction": "",
-//   "network": "icp:mainnet"
+//   "network": "icp:1"
 // }
 
 /// Returned from a facilitator after attempting to settle a payment on-chain.
@@ -413,7 +413,7 @@ mod tests {
         let principal = Principal::from_text("ryjl3-tyaaa-aaaaa-aaaba-cai").unwrap();
         let req = PaymentRequirements {
             scheme: "exact".to_string(),
-            network: "icp:mainnet".to_string(),
+            network: "icp:1".to_string(),
             amount: TokenAmount(1000),
             asset: principal,
             pay_to: principal,

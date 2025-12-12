@@ -12,7 +12,7 @@ fn admin_add_supported_payment(x402_version: u8, scheme: String) -> Result<(), S
     let payment = SupportedKind {
         x402_version,
         scheme,
-        network: "icp:mainnet".to_string(),
+        network: "icp:1".to_string(),
         extra: None,
     };
 

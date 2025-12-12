@@ -3,7 +3,7 @@ import { Principal } from '@dfinity/principal'
 export interface PaymentRequirements {
   /// Payment scheme identifier (e.g., "exact")
   scheme: 'exact' | 'upto'
-  /// Blockchain network identifier (e.g., "icp:mainnet")
+  /// Blockchain network identifier (e.g., "icp:1")
   network: string
   /// Required payment amount in atomic token units
   amount: string

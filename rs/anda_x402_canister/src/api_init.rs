@@ -30,7 +30,7 @@ fn init(args: Option<CanisterArgs>) {
             s.supported_payments = vec![SupportedKind {
                 x402_version: 2,
                 scheme: "exact".to_string(),
-                network: "icp:mainnet".to_string(),
+                network: "icp:1".to_string(),
                 extra: None,
             }];
             s.governance_canister = args.governance_canister;

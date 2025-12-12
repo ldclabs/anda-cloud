@@ -1,8 +1,4 @@
-import {
-  X402Canister,
-  PaymentRequired,
-  formatAmount
-} from '@ldclabs/anda_x402'
+import { X402Canister, PaymentRequired, formatAmount } from '@ldclabs/anda_x402'
 import { Ed25519KeyIdentity } from '@ldclabs/ic-auth'
 import * as readline from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
@@ -68,12 +64,12 @@ async function main() {
     x402Version: 2,
     error: 'some error',
     resource: {
-      url: 'https://anda.ai',
+      url: 'https://anda.ai'
     },
     accepts: [
       {
         scheme: 'exact',
-        network: 'icp:mainnet',
+        network: 'icp:1',
         amount: amount.toString(),
         asset: assetId,
         payTo,
@@ -144,7 +140,7 @@ async function main() {
   // Settle Response: {
   //   success: true,
   //   transaction: '30',
-  //   network: 'icp:mainnet',
+  //   network: 'icp:1',
   //   payer: 'jjn6g-sh75l-r3cxb-wxrkl-frqld-6p6qq-d4ato-wske5-op7s5-n566f-bqe'
   // }
 
