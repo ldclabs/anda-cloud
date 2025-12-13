@@ -1,11 +1,8 @@
-# `@ldclabs/ic_oss_ts`
-![License](https://img.shields.io/crates/l/ic-oss.svg)
-[![Test](https://github.com/ldclabs/ic-oss/actions/workflows/test.yml/badge.svg)](https://github.com/ldclabs/ic-oss/actions/workflows/test.yml)
-[![NPM version](http://img.shields.io/npm/v/@ldclabs/ic_oss_ts.svg)](https://www.npmjs.com/package/@ldclabs/ic_oss_ts)
+# `@ldclabs/anda_x402`
+[![Test](https://github.com/ldclabs/anda-cloud/actions/workflows/test.yml/badge.svg)](https://github.com/ldclabs/anda-cloud/actions/workflows/test.yml)
+[![NPM version](http://img.shields.io/npm/v/@ldclabs/anda_x402.svg)](https://www.npmjs.com/package/@ldclabs/anda_x402)
 
-[ic-oss](https://github.com/ldclabs/ic-oss) is a decentralized Object Storage Service on the Internet Computer.
-
-`@ldclabs/ic_oss_ts` is the Typescript version of the client SDK for the ic-oss cluster.
+`@ldclabs/anda_x402` is the Typescript version of the client SDK for Anda x402 facilitator.
 
 ## License
 
