@@ -83,7 +83,7 @@ async fn check_supported_asset(
     payment_fee: u128,
 ) -> Result<store::AssetInfo, String> {
     let mut info = token_info(asset).await?;
-    if payment_fee < info.transfer_fee {
+    if payment_fee > 0 && payment_fee <= info.transfer_fee {
         return Err(format!(
             "payment fee {} is less than transfer fee {}",
             payment_fee, info.transfer_fee

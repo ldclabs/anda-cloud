@@ -13,7 +13,7 @@ strip = true
 opt-level = 's'
 
 [workspace.package]
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 repository = "https://github.com/ldclabs/anda-cloud"
 keywords = ["anda", "agent", "icp", "cloud"]
