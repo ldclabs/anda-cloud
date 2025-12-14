@@ -489,12 +489,14 @@ pub mod state {
         .map_err(|err| {
             X402Error::SettleError(format!("Failed to transfer payment fee: {}", err))
         })?;
+        // Nat: 483454 => "483_454"
+        let idx: u128 = idx.0.try_into().unwrap_or_default();
+        let tx = idx.to_string();
 
         let log_id = LOGS
             .with_borrow_mut(|r| r.append(&log))
             .expect("failed to append to LOGS");
 
-        let tx = idx.to_string();
         PAYER_STATE.with_borrow_mut(|r| {
             let mut s = r.get(&log.from).unwrap_or_default();
             s.next_nonce = s.next_nonce.saturating_add(1);
