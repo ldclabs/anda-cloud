@@ -737,7 +737,7 @@ pub mod agent {
 mod tests {
     use super::*;
     use ic_auth_types::ByteArrayB64;
-    use rand::Rng;
+    use rand::RngExt;
 
     fn setup() {
         STATE.with_borrow_mut(|s| {
