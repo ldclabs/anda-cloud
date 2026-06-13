@@ -4,7 +4,7 @@ use anda_cloud_cdk::{
     registry::{RegistryError, RegistryState},
 };
 use candid::{CandidType, Principal};
-use ciborium::{from_reader, into_writer};
+use cbor2::{from_slice, to_vec as cbor_to_vec};
 use ic_auth_types::ByteArrayB64;
 use ic_cdk::call::Call;
 use ic_http_certification::{
@@ -281,19 +281,15 @@ impl Storable for AgentLocal {
     const BOUND: Bound = Bound::Unbounded;
 
     fn to_bytes(&self) -> Cow<'_, [u8]> {
-        let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode AgentLocal data");
-        Cow::Owned(buf)
+        Cow::Owned(cbor_to_vec(self).expect("failed to encode AgentLocal data"))
     }
 
     fn into_bytes(self) -> Vec<u8> {
-        let mut buf = vec![];
-        into_writer(&self, &mut buf).expect("failed to encode AgentLocal data");
-        buf
+        cbor_to_vec(&self).expect("failed to encode AgentLocal data")
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode AgentLocal data")
+        from_slice(&bytes).expect("failed to decode AgentLocal data")
     }
 }
 
@@ -407,7 +403,7 @@ pub mod state {
                 if bytes.is_empty() {
                     return;
                 }
-                let v: State = from_reader(&bytes[..]).expect("failed to decode STATE_STORE data");
+                let v: State = from_slice(&bytes).expect("failed to decode STATE_STORE data");
                 *r = v;
             });
         });
@@ -418,7 +414,7 @@ pub mod state {
                     return;
                 }
                 let v: Indexes =
-                    from_reader(&bytes[..]).expect("failed to decode INDEX_STORE data");
+                    from_slice(&bytes).expect("failed to decode INDEX_STORE data");
                 *r = v;
             });
         });
@@ -427,16 +423,12 @@ pub mod state {
     pub fn save() {
         STATE.with_borrow(|r| {
             STATE_STORE.with_borrow_mut(|rs| {
-                let mut buf = vec![];
-                into_writer(r, &mut buf).expect("failed to encode STATE data");
-                rs.set(buf);
+                rs.set(cbor_to_vec(r).expect("failed to encode STATE data"));
             });
         });
         INDEX.with_borrow(|r| {
             INDEX_STORE.with_borrow_mut(|rs| {
-                let mut buf = vec![];
-                into_writer(r, &mut buf).expect("failed to encode INDEX data");
-                rs.set(buf);
+                rs.set(cbor_to_vec(r).expect("failed to encode INDEX data"));
             });
         });
     }

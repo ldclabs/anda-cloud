@@ -86,7 +86,7 @@ impl TEEInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ciborium::Value;
+    use cbor2::Value;
 
     #[test]
     fn test_tee_protocol() {

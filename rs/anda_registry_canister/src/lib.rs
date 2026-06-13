@@ -37,9 +37,14 @@ fn validate_principals(principals: &BTreeSet<Principal>) -> Result<(), String> {
 }
 
 async fn rand_bytes<const N: usize>() -> Result<[u8; N], String> {
-    let mut data = ic_cdk::management_canister::raw_rand()
-        .await
-        .map_err(|err| format!("{err:?}"))?;
+    let mut data: Vec<u8> = ic_cdk::call::Call::bounded_wait(
+        Principal::management_canister(),
+        "raw_rand",
+    )
+    .await
+    .map_err(|err| format!("{err:?}"))?
+    .candid()
+    .map_err(|err| format!("{err:?}"))?;
     data.truncate(N);
     data.try_into().map_err(|err| format!("{err:?}"))
 }

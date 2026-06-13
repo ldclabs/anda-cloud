@@ -1,6 +1,6 @@
 use anda_cloud_cdk::x402::*;
 use candid::{CandidType, Principal};
-use ciborium::{from_reader, into_writer};
+use cbor2::{from_slice, to_vec as cbor_to_vec};
 use ic_http_certification::{
     HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpCertificationTreeEntry,
     cel::{DefaultCelBuilder, create_cel_expr},
@@ -185,19 +185,15 @@ impl Storable for PayerState {
     const BOUND: Bound = Bound::Unbounded;
 
     fn to_bytes(&self) -> Cow<'_, [u8]> {
-        let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode PayerState data");
-        Cow::Owned(buf)
+        Cow::Owned(cbor_to_vec(self).expect("failed to encode PayerState data"))
     }
 
     fn into_bytes(self) -> Vec<u8> {
-        let mut buf = vec![];
-        into_writer(&self, &mut buf).expect("failed to encode PayerState data");
-        buf
+        cbor_to_vec(&self).expect("failed to encode PayerState data")
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode PayerState data")
+        from_slice(&bytes).expect("failed to decode PayerState data")
     }
 }
 
@@ -205,19 +201,15 @@ impl Storable for PaymentLog {
     const BOUND: Bound = Bound::Unbounded;
 
     fn to_bytes(&self) -> Cow<'_, [u8]> {
-        let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode PaymentLog data");
-        Cow::Owned(buf)
+        Cow::Owned(cbor_to_vec(self).expect("failed to encode PaymentLog data"))
     }
 
     fn into_bytes(self) -> Vec<u8> {
-        let mut buf = vec![];
-        into_writer(&self, &mut buf).expect("failed to encode PaymentLog data");
-        buf
+        cbor_to_vec(&self).expect("failed to encode PaymentLog data")
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode PaymentLog data")
+        from_slice(&bytes).expect("failed to decode PaymentLog data")
     }
 }
 
@@ -297,7 +289,7 @@ pub mod state {
                 if bytes.is_empty() {
                     return;
                 }
-                let v: State = from_reader(&bytes[..]).expect("failed to decode STATE_STORE data");
+                let v: State = from_slice(&bytes).expect("failed to decode STATE_STORE data");
                 *h = v;
             });
         });
@@ -306,9 +298,7 @@ pub mod state {
     pub fn save() {
         STATE.with_borrow(|h| {
             STATE_STORE.with_borrow_mut(|r| {
-                let mut buf = vec![];
-                into_writer(h, &mut buf).expect("failed to encode STATE_STORE data");
-                r.set(buf);
+                r.set(cbor_to_vec(h).expect("failed to encode STATE_STORE data"));
             });
         });
     }

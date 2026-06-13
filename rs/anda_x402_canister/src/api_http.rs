@@ -1,7 +1,7 @@
 use anda_cloud_cdk::x402::{SettleResponse, VerifyResponse, X402Error, X402Request};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use candid::{CandidType, Principal};
-use ciborium::from_reader;
+use cbor2::from_slice;
 use ic_auth_types::cbor_into_vec;
 use ic_http_certification::{HeaderField, HttpRequest, HttpUpdateRequest};
 use serde::{Deserialize, Serialize};
@@ -279,7 +279,7 @@ async fn post_settle(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
 
 fn decode_payment(body: &[u8], in_cbor: bool) -> Result<X402Request, X402Error> {
     let req: X402Request = if in_cbor {
-        from_reader(body)
+        from_slice(body)
             .map_err(|err| X402Error::InvalidPayload(format!("failed to decode cbor: {err}")))?
     } else {
         serde_json::from_slice(body)

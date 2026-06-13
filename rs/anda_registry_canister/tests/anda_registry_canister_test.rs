@@ -271,7 +271,7 @@ fn anda_registry_canister_should_work() {
                 .iter()
                 .any(|h| { h.0 == "content-type" && h.1 == "application/cbor" })
         );
-        let agent: Agent = ciborium::from_reader(&rt.body[..]).unwrap();
+        let agent: Agent = cbor2::from_slice(&rt.body).unwrap();
         assert_eq!(agent.info.name, "Anda 2");
         assert!(agent.health_power >= 2000);
     }

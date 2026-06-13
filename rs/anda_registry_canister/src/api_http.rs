@@ -1,7 +1,7 @@
 use anda_cloud_cdk::{agent::ChallengeEnvelope, registry::RegistryError};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use candid::{CandidType, Principal};
-use ciborium::from_reader;
+use cbor2::from_slice;
 use ic_auth_types::cbor_into_vec;
 use ic_http_certification::{HeaderField, HttpRequest, HttpUpdateRequest};
 use serde::{Deserialize, Serialize};
@@ -236,7 +236,7 @@ fn lookup(url: Url, in_cbor: bool) -> Result<Vec<u8>, RegistryError> {
 
 async fn register(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, RegistryError> {
     let envelope: ChallengeEnvelope = if in_cbor {
-        from_reader(body).map_err(|err| RegistryError::BadRequest {
+        from_slice(body).map_err(|err| RegistryError::BadRequest {
             error: format!("failed to decode AgentEnvelope from CBOR, error: {err}"),
         })?
     } else {
@@ -251,7 +251,7 @@ async fn register(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, RegistryError> 
 
 async fn challenge(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, RegistryError> {
     let envelope: ChallengeEnvelope = if in_cbor {
-        from_reader(body).map_err(|err| RegistryError::BadRequest {
+        from_slice(body).map_err(|err| RegistryError::BadRequest {
             error: format!("failed to decode AgentEnvelope from CBOR, error: {err}"),
         })?
     } else {
