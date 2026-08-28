@@ -1,4 +1,4 @@
-import { Principal } from '@dfinity/principal'
+import type { Principal } from '@dfinity/principal'
 
 export interface PaymentRequirements {
   /// Payment scheme identifier (e.g., "exact")
@@ -141,13 +141,30 @@ export function formatAmount(
   decimals: number,
   maxDigits: number = 6
 ): string {
-  const decimalVal = 10n ** BigInt(decimals)
-  const integerPart = amount / decimalVal
-  const fractionalPart = amount % decimalVal
-  const val = Number(integerPart) + Number(fractionalPart) / Number(decimalVal)
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: maxDigits,
     roundingMode: 'trunc'
-  } as Intl.NumberFormatOptions).format(val)
+  } as Intl.NumberFormatOptions).format(toDecimalString(amount, decimals))
+}
+
+/// Renders an atomic token amount as an exact decimal string.
+/// Going through `Number` would round amounts that need more than 53 bits,
+/// e.g. `0.999999999999999999` of an 18 decimals token would become `1`.
+function toDecimalString(
+  amount: bigint,
+  decimals: number
+): Intl.StringNumericLiteral {
+  if (decimals <= 0) {
+    return amount.toString() as Intl.StringNumericLiteral
+  }
+
+  const sign = amount < 0n ? '-' : ''
+  const digits = (amount < 0n ? -amount : amount)
+    .toString()
+    .padStart(decimals + 1, '0')
+  const point = digits.length - decimals
+  return `${sign}${digits.slice(0, point)}.${digits.slice(
+    point
+  )}` as Intl.StringNumericLiteral
 }

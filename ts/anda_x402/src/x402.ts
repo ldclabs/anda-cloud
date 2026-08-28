@@ -1,4 +1,4 @@
-import { HttpAgent, SignIdentity } from '@dfinity/agent'
+import { Actor, HttpAgent, type SignIdentity } from '@dfinity/agent'
 import { DelegationIdentity } from '@dfinity/identity'
 import { Principal } from '@dfinity/principal'
 import {
@@ -7,13 +7,15 @@ import {
   signMessage,
   toDelegationIdentity
 } from '@ldclabs/ic-auth'
-import type { _SERVICE } from '../candid/anda_x402_canister/anda_x402_canister.did.js'
-import { createActor } from '../candid/anda_x402_canister/index.js'
 import {
+  idlFactory as x402IdlFactory,
+  type _SERVICE
+} from '../candid/anda_x402_canister/anda_x402_canister.did.js'
+import {
+  idlFactory as tokenIdlFactory,
   type _SERVICE as _TOKEN_SERVICE,
   type Allowance
 } from '../candid/icrc1_ledger_canister/icrc1_ledger_canister.did.js'
-import { createActor as createTokenActor } from '../candid/icrc1_ledger_canister/index.js'
 import type {
   IcpPayload,
   IcpPayloadAuthorization,
@@ -55,12 +57,18 @@ export class X402Canister {
     this.#agent = HttpAgent.createSync({
       host,
       identity: this.#identity,
-      verifyQuerySignatures: false
+      verifyQuerySignatures: false,
+      // A local replica has its own root key that can only be discovered at
+      // runtime. Against mainnet we must keep the root key pinned in
+      // `@dfinity/agent`, otherwise a malicious host could hand us its own key
+      // and forge the certificates that authenticate payment calls.
+      // The agent fetches it lazily and awaits it before every call.
+      shouldFetchRootKey: isLocalHost(host)
     })
-    if (this.#agent.isLocal()) {
-      this.#agent.fetchRootKey()
-    }
-    this.#actor = createActor(canisterId, { agent: this.#agent })
+    this.#actor = Actor.createActor<_SERVICE>(x402IdlFactory, {
+      agent: this.#agent,
+      canisterId: this.canisterId
+    })
   }
 
   setIdentity(identity: SignIdentity) {
@@ -83,48 +91,23 @@ export class X402Canister {
     res: PaymentRequired,
     asset: string
   ): Promise<X402Request<IcpPayload>> {
-    for (const req of res.accepts) {
-      if (req.network == this.network && req.asset === asset) {
-        const [info, nonce] = await Promise.all([
-          this.getInfo(),
-          this.nextNonce()
-        ])
-
-        if (!info.supportedAssets[asset]) {
-          throw new Error(`Asset ${asset} not supported by x402 facilitator`)
-        }
-
-        const now = Math.floor(Date.now() / 1000)
-        const authorization: IcpPayloadAuthorization = {
-          to: req.payTo,
-          value: req.amount,
-          expiresAt: (now + req.maxTimeoutSeconds) * 1000,
-          nonce: nonce
-        }
-        const signature = await this.signPayload(authorization)
-
-        return {
-          paymentPayload: {
-            x402Version: res.x402Version,
-            accepted: req,
-            payload: {
-              signature,
-              authorization
-            }
-          },
-          paymentRequirements: req
-        }
-      }
+    const req = res.accepts.find(
+      (req) => req.network === this.network && req.asset === asset
+    )
+    if (!req) {
+      throw new Error(`Asset ${asset} not accepted`)
     }
 
-    throw new Error(`Asset ${asset} not accepted`)
+    const request = await this.buildX402Request(req, res.x402Version)
+    request.paymentPayload.resource = res.resource
+    return request
   }
 
   async buildX402Request(
     req: PaymentRequirements,
     x402Version: number
   ): Promise<X402Request<IcpPayload>> {
-    if (req.network != this.network) {
+    if (req.network !== this.network) {
       throw new Error(
         `Network ${req.network} not supported by Anda x402 facilitator`
       )
@@ -235,7 +218,10 @@ export class X402Canister {
     const canisterIdText = toText(tokenCanisterId)
     let actor = this.#tokenActors.get(canisterIdText)
     if (!actor) {
-      actor = createTokenActor(tokenCanisterId, { agent: this.#agent })
+      actor = Actor.createActor<_TOKEN_SERVICE>(tokenIdlFactory, {
+        agent: this.#agent,
+        canisterId: canisterIdText
+      })
       this.#tokenActors.set(canisterIdText, actor)
     }
     return actor
@@ -262,8 +248,7 @@ export class X402Canister {
           token.symbol = (value as { 'Text': string }).Text
           continue
         case 'icrc1:decimals':
-          const decimals = (value as { 'Nat': bigint }).Nat
-          token.decimals = Number(decimals)
+          token.decimals = Number((value as { 'Nat': bigint }).Nat)
           continue
         case 'icrc1:fee':
           token.fee = (value as { 'Nat': bigint }).Nat
@@ -329,9 +314,12 @@ export class X402Canister {
   ): Promise<void> {
     const allowance = await this.allowance(tokenCanisterId, spender)
     const expires_at = allowance.expires_at[0] || 0n
+    // ICRC-2 `expires_at` is nanoseconds since epoch; build it with BigInt
+    // arithmetic so the value is not rounded to the nearest double.
+    const expiresAtFloor = BigInt(Date.now() + 60_000) * 1_000_000n
     if (
       allowance.allowance < amount ||
-      (expires_at > 0 && expires_at < BigInt((Date.now() + 60000) * 1_000_000))
+      (expires_at > 0n && expires_at < expiresAtFloor)
     ) {
       await this.approve(tokenCanisterId, amount, spender)
     }
@@ -353,6 +341,27 @@ export class X402Canister {
     })
 
     return resultOk(res)
+  }
+}
+
+// `HttpAgent.isLocal()` only recognizes `127.0.0.1`, so `http://localhost:4943`
+// would silently be treated as mainnet.
+function isLocalHost(host?: string): boolean {
+  if (!host) {
+    return false
+  }
+
+  try {
+    const { hostname } = new URL(host)
+    return (
+      hostname === 'localhost' ||
+      hostname.endsWith('.localhost') ||
+      hostname === '127.0.0.1' ||
+      hostname.endsWith('.127.0.0.1') ||
+      hostname === '[::1]'
+    )
+  } catch {
+    return false
   }
 }
 
@@ -378,8 +387,28 @@ type Result<T, E> = Ok<T> | Err<E>
 
 function resultOk<T, E>(res: Result<T, E>): T {
   if ('Err' in res) {
-    throw res.Err
+    if (res.Err instanceof Error) {
+      throw res.Err
+    }
+    // Keep the raw candid variant reachable through `cause`.
+    throw new Error(
+      typeof res.Err === 'string' ? res.Err : stringifyErr(res.Err),
+      { cause: res.Err }
+    )
   }
 
   return res.Ok
+}
+
+function stringifyErr(err: unknown): string {
+  try {
+    // ICRC error variants carry `bigint` fields that `JSON.stringify` rejects.
+    return (
+      JSON.stringify(err, (_k, v) =>
+        typeof v === 'bigint' ? v.toString() : v
+      ) ?? String(err)
+    )
+  } catch {
+    return String(err)
+  }
 }
