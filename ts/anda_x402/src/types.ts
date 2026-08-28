@@ -1,4 +1,4 @@
-import type { Principal } from '@dfinity/principal'
+import type { Principal } from '@icp-sdk/core/principal'
 
 export interface PaymentRequirements {
   /// Payment scheme identifier (e.g., "exact")
@@ -134,7 +134,12 @@ export interface StateInfo {
   governanceCanister?: string
 }
 
-const locale = new Intl.Locale(globalThis?.navigator?.language || 'en')
+// Read `navigator` off `globalThis` so the module also type-checks for
+// consumers whose `lib` does not include DOM (Node exposes it since v21).
+const locale = new Intl.Locale(
+  (globalThis as { navigator?: { language?: string } }).navigator?.language ||
+    'en'
+)
 
 export function formatAmount(
   amount: bigint,

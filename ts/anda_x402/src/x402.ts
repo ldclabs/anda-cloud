@@ -1,6 +1,6 @@
-import { Actor, HttpAgent, type SignIdentity } from '@dfinity/agent'
-import { DelegationIdentity } from '@dfinity/identity'
-import { Principal } from '@dfinity/principal'
+import { Actor, HttpAgent, type SignIdentity } from '@icp-sdk/core/agent'
+import { DelegationIdentity } from '@icp-sdk/core/identity'
+import { Principal } from '@icp-sdk/core/principal'
 import {
   bytesToBase64Url,
   deterministicEncode,
@@ -33,7 +33,7 @@ export {
   DelegationIdentity,
   Ed25519KeyIdentity,
   Ed25519PublicKey
-} from '@dfinity/identity'
+} from '@icp-sdk/core/identity'
 
 export class X402Canister {
   readonly canisterId: Principal
@@ -60,7 +60,7 @@ export class X402Canister {
       verifyQuerySignatures: false,
       // A local replica has its own root key that can only be discovered at
       // runtime. Against mainnet we must keep the root key pinned in
-      // `@dfinity/agent`, otherwise a malicious host could hand us its own key
+      // `@icp-sdk/core`, otherwise a malicious host could hand us its own key
       // and forge the certificates that authenticate payment calls.
       // The agent fetches it lazily and awaits it before every call.
       shouldFetchRootKey: isLocalHost(host)

@@ -27,7 +27,10 @@ describe('formatAmount', () => {
   // `formatAmount` renders in the ambient locale, so build the expectations
   // with that locale's decimal separator instead of hardcoding '.'.
   const decimalSep = new Intl.NumberFormat(
-    new Intl.Locale(globalThis?.navigator?.language || 'en')
+    new Intl.Locale(
+      (globalThis as { navigator?: { language?: string } }).navigator
+        ?.language || 'en'
+    )
   )
     .formatToParts(1.1)
     .find((p) => p.type === 'decimal')!.value
