@@ -2,7 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 import { deterministicEncode } from '@ldclabs/ic-auth'
-import { sha3_256 } from '@noble/hashes/sha3'
+import { sha3_256 } from '@noble/hashes/sha3.js'
 import { assert, describe, it } from 'vitest'
 import {
   ASSET_TRANSFER_METHOD_ICRC2,
