@@ -31,25 +31,19 @@ pub fn check_auth(user: &Principal) -> Result<(), String> {
     }
 }
 
-pub async fn call<In, Out>(
-    id: Principal,
-    method: &str,
-    args: In,
-    cycles: u128,
-) -> Result<Out, String>
+pub async fn call<In, Out>(id: Principal, method: &str, args: In) -> Result<Out, String>
 where
     In: ArgumentEncoder + Send,
     Out: candid::CandidType + for<'a> candid::Deserialize<'a>,
 {
-    let res = ic_cdk::call::Call::bounded_wait(id, method)
+    let res = ic_cdk::call::Call::unbounded_wait(id, method)
         .with_args(&args)
-        .with_cycles(cycles)
         .await
-        .map_err(|err| format!("failed to call {} on {:?}, error: {:?}", method, &id, err))?;
+        .map_err(|err| format!("failed to call {} on {:?}, error: {:?}", method, id, err))?;
     res.candid().map_err(|err| {
         format!(
             "failed to decode response from {} on {:?}, error: {:?}",
-            method, &id, err
+            method, id, err
         )
     })
 }
@@ -81,10 +75,19 @@ pub async fn transfer_token_to(
             memo,
             amount: amount.into(),
         },),
-        0,
     )
     .await?;
-    res.map_err(|err| format!("failed to transfer tokens, error: {:?}", err))
+    normalize_transfer_result(res)
+}
+
+fn normalize_transfer_result(res: Result<Nat, TransferError>) -> Result<Nat, String> {
+    match res {
+        Ok(index)
+        | Err(TransferError::Duplicate {
+            duplicate_of: index,
+        }) => Ok(index),
+        Err(err) => Err(format!("failed to transfer tokens, error: {err:?}")),
+    }
 }
 
 pub async fn transfer_token_from(
@@ -93,6 +96,7 @@ pub async fn transfer_token_from(
     to: Principal,
     amount: u128,
     memo: Option<Memo>,
+    created_at_time: Option<u64>,
 ) -> Result<Nat, String> {
     let res: Result<Nat, TransferFromError> = call(
         asset,
@@ -108,14 +112,25 @@ pub async fn transfer_token_from(
                 subaccount: None,
             },
             fee: None,
-            created_at_time: None,
+            created_at_time,
             memo,
             amount: amount.into(),
         },),
-        0,
     )
     .await?;
-    res.map_err(|err| format!("failed to transfer tokens from user, error: {:?}", err))
+    normalize_transfer_from_result(res)
+}
+
+fn normalize_transfer_from_result(res: Result<Nat, TransferFromError>) -> Result<Nat, String> {
+    match res {
+        Ok(index)
+        | Err(TransferFromError::Duplicate {
+            duplicate_of: index,
+        }) => Ok(index),
+        Err(err) => Err(format!(
+            "failed to transfer tokens from user, error: {err:?}"
+        )),
+    }
 }
 
 #[allow(dead_code)]
@@ -137,14 +152,13 @@ pub async fn token_allowance(
                 subaccount: None,
             },
         },),
-        0,
     )
     .await?;
     Ok(res)
 }
 
 pub async fn token_info(asset: Principal) -> Result<store::AssetInfo, String> {
-    let res: Vec<(String, MetadataValue)> = call(asset, "icrc1_metadata", (), 0).await?;
+    let res: Vec<(String, MetadataValue)> = call(asset, "icrc1_metadata", ()).await?;
     let mut info = store::AssetInfo::default();
     for (key, value) in res {
         match (key.as_str(), value) {
@@ -174,4 +188,40 @@ pub async fn token_info(asset: Principal) -> Result<store::AssetInfo, String> {
         info.name = info.symbol.clone();
     }
     Ok(info)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duplicate_icrc1_transfer_is_success() {
+        let index = Nat::from(42_u64);
+        assert_eq!(
+            normalize_transfer_result(Err(TransferError::Duplicate {
+                duplicate_of: index.clone(),
+            }))
+            .unwrap(),
+            index
+        );
+    }
+
+    #[test]
+    fn duplicate_icrc2_transfer_from_is_success() {
+        let index = Nat::from(42_u64);
+        assert_eq!(
+            normalize_transfer_from_result(Err(TransferFromError::Duplicate {
+                duplicate_of: index.clone(),
+            }))
+            .unwrap(),
+            index
+        );
+    }
+
+    #[test]
+    fn non_duplicate_transfer_error_is_preserved() {
+        let error = normalize_transfer_from_result(Err(TransferFromError::TemporarilyUnavailable))
+            .unwrap_err();
+        assert!(error.contains("TemporarilyUnavailable"));
+    }
 }

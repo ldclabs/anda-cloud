@@ -122,6 +122,27 @@ The HTTP API supports both JSON and CBOR formats. The content type is determined
 - For JSON: `application/json`
 - For CBOR: `application/cbor`
 
+CBOR is recommended for settlement requests because its smaller ingress body
+reduces bandwidth-related cycles and decoding work.
+
+#### Settlement Guarantees
+
+- Payment authorizations must expire between 1 minute and 1 hour from the
+  canister's current time.
+- Payment request bodies are limited to 64 KiB; oversized `/settle` requests
+  are rejected by the free query path before they are upgraded.
+- Structurally invalid, badly signed, stale-nonce, and unsupported settlement
+  requests are also rejected during that query preflight, avoiding a paid
+  update for requests that cannot succeed.
+- Retrying the most recently settled authorization is idempotent and returns
+  the original ledger transaction ID.
+- ICRC-2 transfers use a deterministic `created_at_time`, so an ambiguous
+  ledger response can be retried without charging the payer twice.
+
+When upgrading from the legacy log layout, payer state is migrated lazily and
+old logs remain readable. After accepting payments with this layout, do not
+roll back to a pre-migration Wasm because it cannot read the new payer state.
+
 ## Data Types
 
 ### ICP Payment Payload

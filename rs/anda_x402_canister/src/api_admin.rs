@@ -17,7 +17,9 @@ fn admin_add_supported_payment(x402_version: u8, scheme: String) -> Result<(), S
     };
 
     store::state::with_mut(|s| {
-        s.supported_payments.push(payment);
+        if !s.supported_payments.contains(&payment) {
+            s.supported_payments.push(payment);
+        }
         Ok(())
     })
 }
@@ -66,7 +68,7 @@ async fn validate_admin_update_supported_asset(
 }
 
 #[ic_cdk::update(guard = "is_controller")]
-async fn admin_remove_supported_asset(asset: Principal) -> Result<(), String> {
+fn admin_remove_supported_asset(asset: Principal) -> Result<(), String> {
     store::state::with_mut(|s| {
         s.supported_assets.remove(&asset);
         Ok(())
@@ -74,7 +76,7 @@ async fn admin_remove_supported_asset(asset: Principal) -> Result<(), String> {
 }
 
 #[ic_cdk::update]
-async fn validate_remove_update_supported_asset(asset: Principal) -> Result<String, String> {
+fn validate_remove_update_supported_asset(asset: Principal) -> Result<String, String> {
     pretty_format(&(asset,))
 }
 
