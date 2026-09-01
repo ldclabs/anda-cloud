@@ -1,4 +1,10 @@
-import { X402Canister, PaymentRequired, formatAmount } from '@ldclabs/anda_x402'
+import {
+  NETWORK_ICP,
+  PaymentRequired,
+  X402Canister,
+  X402_VERSION,
+  formatAmount
+} from '@ldclabs/anda_x402'
 import { Ed25519KeyIdentity } from '@ldclabs/ic-auth'
 import * as readline from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
@@ -61,19 +67,23 @@ async function main() {
   const payTo =
     '77ibd-jp5kr-moeco-kgoar-rro5v-5tng4-krif5-5h2i6-osf2f-2sjtv-kqe'
   const req: PaymentRequired = {
-    x402Version: 2,
+    x402Version: X402_VERSION,
     error: 'some error',
     resource: {
-      url: 'https://anda.ai'
+      url: 'https://anda.ai',
+      serviceName: 'Anda',
+      tags: ['ai-agent']
     },
     accepts: [
       {
         scheme: 'exact',
-        network: 'icp:1',
+        network: NETWORK_ICP,
         amount: amount.toString(),
         asset: assetId,
         payTo,
         maxTimeoutSeconds: 300
+        // `extra.assetTransferMethod` defaults to "icrc2" and
+        // `extra.paymentFlow` to "authorization", so both may be omitted.
       }
     ]
   }
@@ -141,7 +151,8 @@ async function main() {
   //   success: true,
   //   transaction: '30',
   //   network: 'icp:1',
-  //   payer: 'jjn6g-sh75l-r3cxb-wxrkl-frqld-6p6qq-d4ato-wske5-op7s5-n566f-bqe'
+  //   payer: 'jjn6g-sh75l-r3cxb-wxrkl-frqld-6p6qq-d4ato-wske5-op7s5-n566f-bqe',
+  //   amount: '100000000'
   // }
 
   await new Promise((resolve) => setTimeout(resolve, 3000)) // wait for fee transaction

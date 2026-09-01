@@ -1,4 +1,4 @@
-use anda_cloud_cdk::x402::SupportedKind;
+use anda_cloud_cdk::x402::{NETWORK_ICP, SupportedKind};
 use candid::{Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 
@@ -12,7 +12,7 @@ fn admin_add_supported_payment(x402_version: u8, scheme: String) -> Result<(), S
     let payment = SupportedKind {
         x402_version,
         scheme,
-        network: "icp:1".to_string(),
+        network: NETWORK_ICP.to_string(),
         extra: None,
     };
 

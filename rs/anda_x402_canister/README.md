@@ -4,7 +4,7 @@ A fully on-chain x402 payment facilitator on the Internet Computer, part of [And
 
 ## Overview
 
-`anda_x402_canister` is an ICP smart contract that functions as a payment facilitator based on the [x402 Protocol](https://www.x402.org). It handles payment verification and settlement for services within the Anda Cloud ecosystem, supporting multiple ICRC-2 compatible tokens.
+`anda_x402_canister` is an ICP smart contract that functions as a payment facilitator based on the [x402 Protocol](https://www.x402.org), version 2. It handles payment verification and settlement for services within the Anda Cloud ecosystem, supporting multiple ICRC-2 compatible tokens.
 
 ## Features
 
@@ -106,7 +106,9 @@ Full Candid API definition: [anda_x402_canister.did](https://github.com/ldclabs/
 
 ### HTTP API
 
-The canister supports HTTP requests for payment operations. Please see [x402 Protocol Specification](https://github.com/coinbase/x402/blob/main/specs/x402-specification.md) for details.
+The canister supports HTTP requests for payment operations. Please see the
+[x402 Protocol Specification v2](https://github.com/x402-foundation/x402/blob/main/specs/x402-specification-v2.md)
+for details.
 
 #### Facilitator Endpoints
 
@@ -114,6 +116,39 @@ The canister supports HTTP requests for payment operations. Please see [x402 Pro
 - `GET /supported`: Get a list of supported payment kinds.
 - `POST /verify`: Verify a payment authorization without settling.
 - `POST /settle`: Settle a payment by transferring funds.
+
+`GET /supported` also publishes the facilitator's signer under the `icp:*`
+CAIP-2 pattern. That signer is this canister: it is the ICRC-2 spender that
+pulls every payment, so it is the principal payers must approve.
+
+```json
+{
+  "kinds": [{ "x402Version": 2, "scheme": "exact", "network": "icp:1" }],
+  "extensions": [],
+  "signers": { "icp:*": ["ogkpr-lyaaa-aaaap-an5fq-cai"] }
+}
+```
+
+#### Mechanism: `exact` on `icp:1`
+
+Payment requirements carry two protocol-reserved keys in `extra`
+(specification section 6.1). Both may be omitted, in which case the mechanism
+defaults below apply; any other value is rejected with
+`invalid_payment_requirements`.
+
+| Key                   | Supported values                    | Default           |
+| --------------------- | ----------------------------------- | ----------------- |
+| `assetTransferMethod` | `icrc2`                             | `icrc2`           |
+| `paymentFlow`         | `authorization`, `upfront`          | `authorization`   |
+
+`icrc2` means the payer approves this canister as an ICRC-2 spender and the
+facilitator pulls the funds with `icrc2_transfer_from` at settlement.
+
+`escrow` is not supported: a single ICRC-2 pull cannot express a deposit
+settle followed by a final-charge settle. `authorization` and `upfront` differ
+only in the order the *resource server* calls `/verify` and `/settle`; the
+facilitator's own work is identical, and clients should prefer `authorization`
+so funds move only after the resource has delivered.
 
 #### Content Types
 
@@ -170,6 +205,34 @@ export interface IcpPayloadAuthorization {
   nonce: number
 }
 ```
+
+### Settlement Response
+
+```json
+{
+  "success": true,
+  "transaction": "30",
+  "network": "icp:1",
+  "payer": "jjn6g-sh75l-r3cxb-wxrkl-frqld-6p6qq-d4ato-wske5-op7s5-n566f-bqe",
+  "amount": "100000000"
+}
+```
+
+`transaction` is the ICRC ledger transaction index of the transfer, and
+`amount` is what the payer was charged in atomic units, i.e. the authorized
+value including the facilitator's payment fee. A failed settlement reports
+`success: false` with an `errorReason` and an empty `transaction`.
+
+### Resource Metadata
+
+`ResourceInfo` accompanies both `PaymentRequired` and `PaymentPayload`. Beyond
+`url`, `description` and `mimeType`, v2 adds discovery metadata, which the
+facilitator bounds so a resource server cannot smuggle unbounded or
+non-printable text into a listing:
+
+- `serviceName`: printable ASCII, at most 32 characters.
+- `tags`: at most 5 entries, each constrained like `serviceName`.
+- `iconUrl`: absolute `https`/`http` URL, at most 2048 characters.
 
 ## License
 Copyright © 2024-2025 [LDC Labs](https://github.com/ldclabs).

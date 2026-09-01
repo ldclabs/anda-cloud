@@ -1,4 +1,6 @@
-use anda_cloud_cdk::x402::{SettleResponse, VerifyResponse, X402Error, X402Request};
+use anda_cloud_cdk::x402::{
+    NETWORK_ICP, SettleResponse, TokenAmount, VerifyResponse, X402Error, X402Request,
+};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use candid::{CandidType, Principal};
 use cbor2::from_slice;
@@ -290,27 +292,19 @@ async fn post_settle(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
 }
 
 fn encode_settle_result(
-    result: Result<(Principal, String), (X402Error, Option<Principal>)>,
+    result: Result<Settlement, (X402Error, Option<Principal>)>,
     in_cbor: bool,
 ) -> Result<Vec<u8>, HttpError> {
-    let network = "icp:1".to_string();
+    let network = NETWORK_ICP.to_string();
     let res = match result {
-        Ok((payer, transaction)) => SettleResponse {
-            success: true,
-            error_reason: None,
-            payer: Some(payer.to_string()),
-            transaction,
+        Ok(settlement) => SettleResponse::settled(
             network,
-        },
+            settlement.payer.to_string(),
+            settlement.transaction,
+            settlement.amount,
+        ),
         Err((err, maybe_payer)) => {
-            let payer = maybe_payer.map(|p| p.to_string());
-            SettleResponse {
-                success: false,
-                error_reason: Some(err.to_string()),
-                payer,
-                transaction: "".to_string(),
-                network,
-            }
+            SettleResponse::failed(network, maybe_payer.map(|p| p.to_string()), err)
         }
     };
 
@@ -393,11 +387,20 @@ fn verify_payment(
     Ok(payer)
 }
 
+/// A payment the ledger has moved, as reported back to the resource server.
+struct Settlement {
+    payer: Principal,
+    transaction: String,
+    /// What the payer was charged, i.e. the authorized value including the
+    /// facilitator's payment fee.
+    amount: TokenAmount,
+}
+
 async fn settle_payment(
     canister_self: Principal,
     req: X402Request,
     now_ms: u64,
-) -> Result<(Principal, String), (X402Error, Option<Principal>)> {
+) -> Result<Settlement, (X402Error, Option<Principal>)> {
     // Same ordering as `verify_payment`: the payer-independent checks are cheap,
     // the signature verification is not.
     let asset_info = store::state::verify_requirements(&req.payment_payload, now_ms)
@@ -409,11 +412,18 @@ async fn settle_payment(
         .verify_signature(now_ms, Some(canister_self))
         .map_err(|err| (X402Error::InvalidPayloadSignature(err), None))?;
 
+    let amount = req.payment_payload.payload.authorization.value;
     let asset_info = match store::state::verify_payer(payer, &req.payment_payload, asset_info)
         .map_err(|err| (err, Some(payer)))?
     {
         store::VerifiedPayment::Pending(asset_info) => asset_info,
-        store::VerifiedPayment::Settled(transaction) => return Ok((payer, transaction)),
+        store::VerifiedPayment::Settled(transaction) => {
+            return Ok(Settlement {
+                payer,
+                transaction,
+                amount,
+            });
+        }
     };
 
     let created_at_time =
@@ -433,11 +443,15 @@ async fn settle_payment(
         transaction: String::new(),
     };
 
-    let tx =
+    let transaction =
         store::state::transfer_funds(canister_self, log, asset_info.transfer_fee, created_at_time)
             .await
             .map_err(|err| (err, Some(payer)))?;
-    Ok((payer, tx))
+    Ok(Settlement {
+        payer,
+        transaction,
+        amount,
+    })
 }
 
 fn payment_created_at_time(expires_at: u64) -> Result<u64, X402Error> {
@@ -494,7 +508,9 @@ mod tests {
         let response: SettleResponse = serde_json::from_slice(&body).unwrap();
 
         assert!(!response.success);
-        assert_eq!(response.network, "icp:1");
+        assert_eq!(response.network, NETWORK_ICP);
+        assert!(response.transaction.is_empty());
+        assert!(response.amount.is_none());
         assert_eq!(
             response.error_reason.as_deref(),
             Some("invalid_payload: bad request")

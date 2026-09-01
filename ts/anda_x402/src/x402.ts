@@ -16,6 +16,17 @@ import {
   type _SERVICE as _TOKEN_SERVICE,
   type Allowance
 } from '../candid/icrc1_ledger_canister/icrc1_ledger_canister.did.js'
+import {
+  ASSET_TRANSFER_METHOD_ICRC2,
+  EXTRA_ASSET_TRANSFER_METHOD,
+  EXTRA_PAYMENT_FLOW,
+  NETWORK_ICP,
+  SUPPORTED_PAYMENT_FLOWS,
+  X402_VERSION,
+  assetTransferMethodOf,
+  isSupportedRequirement,
+  paymentFlowOf
+} from './types.js'
 import type {
   IcpPayload,
   IcpPayloadAuthorization,
@@ -23,6 +34,7 @@ import type {
   PaymentRequired,
   PaymentRequirements,
   StateInfo,
+  SupportedResponse,
   TokenInfo,
   X402Request
 } from './types.js'
@@ -50,7 +62,7 @@ export class X402Canister {
     host?: string
   ) {
     this.canisterId = toPrincipal(canisterId)
-    this.network = `icp:1`
+    this.network = NETWORK_ICP
     this.endpoint = `https://${this.canisterId.toText()}.icp0.io`
     this.#identity = toDelegationIdentity(identity)
 
@@ -91,15 +103,37 @@ export class X402Canister {
     res: PaymentRequired,
     asset: string
   ): Promise<X402Request<IcpPayload>> {
-    const req = res.accepts.find(
-      (req) => req.network === this.network && req.asset === asset
+    if (res.x402Version !== X402_VERSION) {
+      throw new Error(
+        `x402 version ${res.x402Version} not supported, expected ${X402_VERSION}`
+      )
+    }
+
+    // Entries whose reserved `extra` keys this SDK does not recognize are
+    // skipped rather than rejected: another entry may still be payable.
+    const candidates = res.accepts.filter(
+      (req) =>
+        req.network === this.network &&
+        req.asset === asset &&
+        isSupportedRequirement(req)
     )
-    if (!req) {
+    if (candidates.length === 0) {
       throw new Error(`Asset ${asset} not accepted`)
     }
 
+    // Prefer post-handler settlement when the resource offers both, so the
+    // funds only move once the resource has actually delivered.
+    const req =
+      candidates.find((r) => paymentFlowOf(r) === 'authorization') ??
+      candidates[0]!
+
     const request = await this.buildX402Request(req, res.x402Version)
     request.paymentPayload.resource = res.resource
+    if (res.extensions) {
+      // Echo back what the server advertised. A client may add to the info it
+      // received, but must not drop or overwrite any of it.
+      request.paymentPayload.extensions = res.extensions
+    }
     return request
   }
 
@@ -110,6 +144,20 @@ export class X402Canister {
     if (req.network !== this.network) {
       throw new Error(
         `Network ${req.network} not supported by Anda x402 facilitator`
+      )
+    }
+
+    const method = assetTransferMethodOf(req)
+    if (method !== ASSET_TRANSFER_METHOD_ICRC2) {
+      throw new Error(
+        `extra.${EXTRA_ASSET_TRANSFER_METHOD} ${method} not supported by Anda x402 facilitator, expected ${ASSET_TRANSFER_METHOD_ICRC2}`
+      )
+    }
+
+    const flow = paymentFlowOf(req)
+    if (!SUPPORTED_PAYMENT_FLOWS.includes(flow)) {
+      throw new Error(
+        `extra.${EXTRA_PAYMENT_FLOW} ${flow} not supported by Anda x402 facilitator`
       )
     }
 
@@ -143,6 +191,7 @@ export class X402Canister {
     const signature = await this.signPayload(authorization)
 
     return {
+      x402Version,
       paymentPayload: {
         x402Version,
         accepted: req,
@@ -153,6 +202,21 @@ export class X402Canister {
       },
       paymentRequirements: req
     }
+  }
+
+  /// Fetches the facilitator's `GET /supported` document: the payment kinds and
+  /// extensions it implements, plus the `icp:*` signer the payer must approve
+  /// as their ICRC-2 spender.
+  async getSupported(): Promise<SupportedResponse> {
+    const res = await fetch(`${this.endpoint}/supported`, {
+      headers: { accept: 'application/json' }
+    })
+    if (!res.ok) {
+      throw new Error(
+        `GET ${this.endpoint}/supported failed with ${res.status}: ${await res.text()}`
+      )
+    }
+    return (await res.json()) as SupportedResponse
   }
 
   async getInfo(): Promise<StateInfo> {

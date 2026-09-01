@@ -387,10 +387,19 @@ pub mod state {
     }
 
     pub fn supported() -> SupportedResponse {
+        // The canister is the ICRC-2 spender that pulls every payment, so it is
+        // the address payers must approve. Publishing it under the `icp:*`
+        // CAIP-2 pattern is what lets a client discover that without having to
+        // be told the facilitator's canister ID out of band.
+        let signers = BTreeMap::from([(
+            "icp:*".to_string(),
+            vec![ic_cdk::api::canister_self().to_string()],
+        )]);
+
         with(|state| SupportedResponse {
             kinds: state.supported_payments.clone().into_iter().collect(),
             extensions: vec![],
-            signers: BTreeMap::new(),
+            signers,
         })
     }
 
@@ -482,15 +491,20 @@ pub mod state {
         payload: &PaymentPayload,
         now_ms: u64,
     ) -> Result<AssetInfo, X402Error> {
-        if payload.accepted.network != "icp:1" {
+        if payload.accepted.network != NETWORK_ICP {
             return Err(X402Error::InvalidNetwork(format!(
-                "{}, expected: icp:1",
+                "{}, expected: {NETWORK_ICP}",
                 payload.accepted.network
             )));
         }
 
+        // The reserved `extra` keys decide *how* value moves and *when*, so an
+        // unrecognized value must be refused rather than silently served as if
+        // it were the ICRC-2 default.
+        payload.accepted.validate()?;
+
         if payload.payload.authorization.expires_at < now_ms.saturating_add(CLOCK_SKEW_MS) {
-            return Err(X402Error::InvalidPayload(format!(
+            return Err(X402Error::InvalidPayloadAuthorizationValidBefore(format!(
                 "Expired authorization: {}, current time: {}",
                 payload.payload.authorization.expires_at, now_ms
             )));
@@ -974,7 +988,7 @@ mod tests {
         let expired = payment_payload();
         assert!(matches!(
             state::verify_requirements(&expired, expired.payload.authorization.expires_at),
-            Err(X402Error::InvalidPayload(_))
+            Err(X402Error::InvalidPayloadAuthorizationValidBefore(_))
         ));
 
         let too_long_lived = payment_payload();
@@ -989,6 +1003,50 @@ mod tests {
         // No supported payment kinds are configured in this test state.
         assert!(matches!(
             state::verify_requirements(&payment_payload(), now_ms),
+            Err(X402Error::InvalidX402Version(_))
+        ));
+    }
+
+    #[test]
+    fn reserved_extra_keys_gate_the_mechanism() {
+        let now_ms = 1_799_999_700_000;
+
+        // `escrow` needs two settles, which the single ICRC-2 pull cannot serve.
+        let mut escrow = payment_payload();
+        escrow.accepted.extra = Some(Map::from_iter([(
+            EXTRA_PAYMENT_FLOW.to_string(),
+            Value::String("escrow".to_string()),
+        )]));
+        assert!(matches!(
+            state::verify_requirements(&escrow, now_ms),
+            Err(X402Error::InvalidPaymentRequirements(_))
+        ));
+
+        let mut unknown_method = payment_payload();
+        unknown_method.accepted.extra = Some(Map::from_iter([(
+            EXTRA_ASSET_TRANSFER_METHOD.to_string(),
+            Value::String("eip3009".to_string()),
+        )]));
+        assert!(matches!(
+            state::verify_requirements(&unknown_method, now_ms),
+            Err(X402Error::InvalidPaymentRequirements(_))
+        ));
+
+        // Explicit mechanism defaults get past this gate and fail later, on the
+        // payment kinds this test state does not configure.
+        let mut defaults = payment_payload();
+        defaults.accepted.extra = Some(Map::from_iter([
+            (
+                EXTRA_ASSET_TRANSFER_METHOD.to_string(),
+                Value::String(ASSET_TRANSFER_METHOD_ICRC2.to_string()),
+            ),
+            (
+                EXTRA_PAYMENT_FLOW.to_string(),
+                Value::String("upfront".to_string()),
+            ),
+        ]));
+        assert!(matches!(
+            state::verify_requirements(&defaults, now_ms),
             Err(X402Error::InvalidX402Version(_))
         ));
     }

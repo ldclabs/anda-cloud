@@ -1,4 +1,4 @@
-use anda_cloud_cdk::x402::SupportedKind;
+use anda_cloud_cdk::x402::{NETWORK_ICP, SupportedKind, X402_VERSION};
 use candid::{CandidType, Principal};
 use serde::Deserialize;
 
@@ -28,9 +28,9 @@ fn init(args: Option<CanisterArgs>) {
         store::state::with_mut(|s| {
             s.name = args.name;
             s.supported_payments = vec![SupportedKind {
-                x402_version: 2,
+                x402_version: X402_VERSION,
                 scheme: "exact".to_string(),
-                network: "icp:1".to_string(),
+                network: NETWORK_ICP.to_string(),
                 extra: None,
             }];
             s.governance_canister = args.governance_canister;
