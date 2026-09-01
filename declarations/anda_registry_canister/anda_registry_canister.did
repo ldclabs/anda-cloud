@@ -1,73 +1,208 @@
+// Represents an AI agent registration information in the Anda network system.
 type Agent = record {
+  // The unique identifier of the agent.
   id : principal;
+  // Optional Trusted Execution Environment information where the agent is running.
   tee : opt TEEInfo;
+  // Timestamp when the current challenge expires.
   challenged_expiration : nat64;
+  // Information about the agent, including name, description, and supported protocols.
   info : AgentInfo;
+  // Timestamp when the agent was registered in milliseconds since the Unix epoch.
   created_at : nat64;
+  // Timestamp when the agent was last challenged in milliseconds since the Unix epoch.
   challenged_at : nat64;
+  // The principal that issued the challenge to this agent.
   challenged_by : principal;
+  // The most recent activation timestamp, updated when an agent successfully responds to a challenge
+  // after its previous challenge has expired.
+  // The agent's uptime can be calculated as: uptime = now_ms - actived_start
   actived_start : nat64;
+  // The challenge code for the next round, used to ensure the agent is in a healthy state.
   challenge_code : blob;
+  // Accumulated health value used to assess the agent's availability.
+  // This value increases with each successful challenge and decreases when challenges expire.
+  // 
+  // Calculation example:
+  // 1. Assuming the challenge validity period is 1 hour (3,600,000 ms)
+  // 2. When an agent is successfully challenged, health_power increases by (now_ms - challenged_at)
+  // 3. When an agent hasn't been successfully challenged for over 1 hour (e.g., challenge after 1.5 hours),
+  // health_power decreases by (now_ms - challenged_at), which would be 5,400,000
+  // and actived_start is reset to now_ms
   health_power : nat64;
 };
+// Contains descriptive and operational information about an AI agent.
+// 
+// This structure holds the metadata and configuration details that define
+// an agent's capabilities, endpoints, and supported protocols.
 type AgentInfo = record {
+  // The dMsg.net canister where the agent profile is stored.
   handle_canister : opt principal;
+  // Information about the agent's service provider.
   provider : opt AgentProvider;
+  // A endpoint URL for the agent. This is the URL that other agents and
+  // users will use to communicate with the agent.
   endpoint : text;
+  // Human readable name of the agent.
+  // (e.g. "Anda ICP")
   name : text;
+  // Communication protocols the agent supports.
   protocols : vec AgentProtocol;
+  // A human-readable description of the agent. Used to assist users and
+  // other agents in understanding what the agent can do.
+  // (e.g. "Agent that helps users with recipes and cooking.")
   description : text;
+  // Unique account identifier of the agent.
   handle : text;
+  // A URL to an image representing the agent, such as a logo or avatar.
+  // (e.g. "https://DOMAIN/path/to/image.png")
   image : text;
 };
+// Information about the agent's communication protocol.
 type AgentProtocol = record {
+  // A URI for the agent protocol's endpoint.
+  // (e.g. "https://DOMAIN/.well-known/agent.json")
   endpoint : text;
+  // The name of the agent protocol. Should be uppercase.
+  // (e.g. "A2A", "MCP", "X402")
   name : text;
+  // The version of the agent protocol.
+  // (e.g. "v1")
   version : opt text;
 };
+// Information about the agent's service provider.
 type AgentProvider = record {
+  // The unique identifier of the agent provider.
   id : principal;
+  // A URL for the agent provider's website or relevant documentation.
   url : text;
+  // The agent provider's logo.
   logo : text;
+  // The name of the agent provider's organization.
   name : text;
 };
 type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+// A complete envelope containing a challenge request and its authentication.
+// 
+// This structure is used for secure agent registration and verification,
+// combining the challenge data with authentication proof and optional TEE information.
+// 
+// The complete challenge process is as follows:
+// 1. The challenger obtains the agent's challenge code from the Registry Canister.
+// For first-time registration, the challenge code is [0u8; 32].
+// 2. The challenger obtains the agent's latest information through its protocol
+// and generates a ChallengeRequest.
+// 3. The challenger signs the ChallengeRequest with their ICP identity and sends it to the agent.
+// 4. Upon receiving the challenger's request, the agent confirms the information
+// and signs it with its own ICP identity.
+// 5. If the agent is running in a TEE environment, it also generates TEE information,
+// including an attestation containing this challenge information.
+// 6. The challenger sends the ChallengeEnvelope returned by the agent to the Registry Canister.
+// 7. The Registry Canister verifies the ChallengeEnvelope and updates the agent's status.
+// 8. Since the challenge code is updated after each successful challenge, only the first
+// challenger for a given challenge code can succeed. Requests from other challengers
+// for the same challenge code will be invalid.
 type ChallengeEnvelope = record {
+  // The agent's signature on the challenge request.
   authentication : SignedEnvelope;
+  // TEE information if the agent is running in a Trusted Execution Environment.
   tee : opt TEEInfo;
+  // The challenge request initiated by the challenger.
   request : ChallengeRequest;
 };
+// Represents a challenge request initiated by a challenger to an agent.
+// 
+// This structure contains all the necessary information for a challenger
+// to verify an agent's health and update its information in the registry.
 type ChallengeRequest = record {
+  // Authentication signature information from the challenger.
+  // The challenger must be registered in the Anda Registry Canister, otherwise the challenge will fail.
   authentication : opt SignedEnvelope;
+  // Latest information about the agent being challenged.
+  // When the challenge is successful, this information will be updated in the Anda Registry Canister,
+  // effectively synchronizing the agent's information through the challenge process.
   agent : AgentInfo;
+  // The challenge code that must be responded to.
   code : blob;
+  // Creation timestamp of the challenge request in milliseconds since the Unix epoch.
   created_at : nat64;
+  // The registry canister where the agent is registered.
   registry : principal;
 };
-type DelegationCompact = record { e : nat64; p : blob; t : opt vec principal };
+// DelegationCompact is a compact representation of a [`Delegation`].
+// It is used to reduce the size of the delegation when it is serialized.
+type DelegationCompact = record {
+  // The nanosecond UNIX timestamp after which the delegation is invalid,
+  // encoded as `e` in compact JSON/CBOR maps.
+  e : nat64;
+  // The delegated-to key, encoded as `p` in compact JSON/CBOR maps.
+  p : blob;
+  // Optional canister targets, encoded as `t` in compact JSON/CBOR maps.
+  t : opt vec principal;
+  // Optional permissions, encoded as `perm` in compact JSON/CBOR maps.
+  perm : opt DelegationPermissions;
+};
+// The kinds of requests a [`Delegation`] permits.
+type DelegationPermissions = variant {
+  // All request types are permitted.
+  all;
+  // Only query calls and `read_state` requests are permitted.
+  queries;
+};
 type InitArgs = record {
   governance_canister : opt principal;
   name : text;
   challenge_expires_in_ms : nat64;
 };
+// Represents errors that can occur during registry operations.
+// 
+// This enum provides specific error types with associated messages
+// to help diagnose and handle different failure scenarios.
 type RegistryError = variant {
+  // Error when an agent with the specified handle cannot be found.
   NotFound : record { handle : text };
+  // A generic error with a descriptive message.
   Generic : record { error : text };
+  // Error when the caller is not authenticated or lacks valid credentials.
   Unauthorized : record { error : text };
+  // Error when attempting to register an agent with a handle that already exists.
   AlreadyExists : record { handle : text };
+  // Error when the requested operation is not supported by the registry.
   NotSupported : record { error : text };
+  // Error when the caller is authenticated but lacks permission for the operation.
   Forbidden : record { error : text };
+  // Error when the request is malformed or contains invalid parameters.
   BadRequest : record { error : text };
 };
+// Represents the state of an Anda Registry Canister.
+// 
+// The Registry Canister is responsible for managing agent registrations,
+// maintaining a list of authorized challengers, and coordinating with
+// other registry canisters in a distributed network.
 type RegistryState = record {
+  // Maximum number of agents that can be registered in this registry.
   max_agent : nat64;
+  // Optional principal ID of the governance canister that controls this registry.
+  // If set, certain administrative operations require approval from this canister.
   governance_canister : opt principal;
+  // The name of this registry instance.
   name : text;
+  // Set of principal IDs authorized to issue challenges to agents.
+  // Only principals in this set can initiate the challenge process.
   challengers : vec principal;
+  // Set of principal IDs subscribed to registry events.
+  // These subscribers receive notifications about agent registration changes.
   subscribers : vec principal;
+  // Duration in milliseconds after which a challenge expires.
+  // Agents must respond to challenges within this timeframe to maintain their active status.
   challenge_expires_in_ms : nat64;
+  // Set of principal IDs of peer registry canisters in the network.
+  // These peers can synchronize agent information across the network.
   peers : vec principal;
+  // Set of principal IDs of name service canisters associated with this registry.
+  // These canisters handle agent name resolution and discovery.
   name_canisters : vec principal;
+  // Total number of agents currently registered in this registry.
   agents_total : nat64;
 };
 type Result = variant { Ok; Err : text };
@@ -84,20 +219,67 @@ type Result_5 = variant {
 };
 type Result_6 = variant { Ok : vec Agent; Err : RegistryError };
 type Result_7 = variant { Ok : text; Err : text };
-type SignedDelegationCompact = record { d : DelegationCompact; s : blob };
-type SignedEnvelope = record {
-  d : opt vec SignedDelegationCompact;
-  h : opt blob;
-  p : blob;
+// SignedDelegationCompact is a compact representation of a [`SignedDelegation`].
+// It is used to reduce the size of the delegation when it is serialized.
+type SignedDelegationCompact = record {
+  // The compact delegation payload, encoded as `d`.
+  d : DelegationCompact;
+  // The signature over the delegation message, encoded as `s`.
   s : blob;
 };
+// The authentication envelope for Internet Computer authentication.
+// 
+// This structure encapsulates all the necessary components for authenticating
+// a request to an Internet Computer service. It includes the public key of the
+// sender, the signature, the content digest, and an optional delegation chain.
+// 
+// The envelope can be serialized to and from various formats, including bytes,
+// base64 strings, and HTTP headers, making it versatile for different transport
+// mechanisms.
+type SignedEnvelope = record {
+  // The chain of delegations connecting `pubkey` to `signature`, in order.
+  // Each delegation authorizes the next entity in the chain to sign on behalf
+  // of the previous entity, forming a chain of trust from the original identity
+  // to the actual signer.
+  d : opt vec SignedDelegationCompact;
+  // The request content's hash digest that was signed by the sender.
+  // This is typically a SHA-256 or SHA3-256 hash of the request content.
+  h : opt blob;
+  // The public key of the self-authenticating principal this request is from.
+  // This is the head of the delegation chain (if any) and is used to derive
+  // the principal ID of the sender.
+  p : blob;
+  // A cryptographic signature authorizing the request.
+  // When delegations are involved, this is the signature from the tail of the
+  // delegation chain, not necessarily made by the owner of `pubkey`.
+  s : blob;
+};
+// Represents information about a Trusted Execution Environment (TEE) where an agent is running.
+// 
+// TEEs provide hardware-based isolation and security guarantees for code execution.
+// This structure contains identification and attestation information for a TEE instance.
 type TEEInfo = record {
+  // The principal identifier of the TEE instance.
   id : principal;
+  // URL where additional TEE information can be retrieved.
+  // (e.g. https://DOMAIN/.well-known/tee)
   url : text;
+  // The type of TEE technology being used.
   kind : TEEKind;
+  // Optional attestation data that proves the TEE's authenticity.
+  // This typically contains cryptographic evidence that the TEE is genuine
+  // and running the expected code.
   attestation : opt blob;
 };
-type TEEKind = variant { NITRO };
+// Enumerates the supported types of Trusted Execution Environments.
+// 
+// Different TEE technologies provide varying levels of security guarantees
+// and are supported by different hardware platforms.
+type TEEKind = variant {
+  // AWS Nitro Enclaves, a TEE technology provided by Amazon Web Services.
+  // Nitro Enclaves provide isolated compute environments for sensitive workloads.
+  NITRO;
+};
 type UpgradeArgs = record {
   governance_canister : opt principal;
   name : opt text;

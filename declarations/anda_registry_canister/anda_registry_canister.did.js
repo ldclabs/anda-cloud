@@ -11,10 +11,15 @@ export const idlFactory = ({ IDL }) => {
   });
   const ChainArgs = IDL.Variant({ 'Upgrade' : UpgradeArgs, 'Init' : InitArgs });
   const Result = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
+  const DelegationPermissions = IDL.Variant({
+    'all' : IDL.Null,
+    'queries' : IDL.Null,
+  });
   const DelegationCompact = IDL.Record({
     'e' : IDL.Nat64,
     'p' : IDL.Vec(IDL.Nat8),
     't' : IDL.Opt(IDL.Vec(IDL.Principal)),
+    'perm' : IDL.Opt(DelegationPermissions),
   });
   const SignedDelegationCompact = IDL.Record({
     'd' : DelegationCompact,

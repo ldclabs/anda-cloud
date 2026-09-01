@@ -403,7 +403,7 @@ pub mod state {
                 if bytes.is_empty() {
                     return;
                 }
-                let v: State = from_slice(&bytes).expect("failed to decode STATE_STORE data");
+                let v: State = from_slice(bytes).expect("failed to decode STATE_STORE data");
                 *r = v;
             });
         });
@@ -414,7 +414,7 @@ pub mod state {
                     return;
                 }
                 let v: Indexes =
-                    from_slice(&bytes).expect("failed to decode INDEX_STORE data");
+                    from_slice(bytes).expect("failed to decode INDEX_STORE data");
                 *r = v;
             });
         });

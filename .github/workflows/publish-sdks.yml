@@ -1,0 +1,145 @@
+# npm and crates.io use OIDC Trusted Publishing (no stored tokens). Configure the
+# trusted publisher for each registry to point at this repo + workflow file:
+# - npm:       https://www.npmjs.com/package/@ldclabs/anda_x402/access
+# - crates.io: https://crates.io/crates/anda_cloud_cdk/settings
+name: Publish SDKs
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and validate publish commands without uploading packages"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-sdks-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify SDKs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check SDK versions
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+          import tomllib
+
+          root = pathlib.Path.cwd()
+          npm_version = json.loads((root / "ts/anda_x402/package.json").read_text())["version"]
+          cargo_version = tomllib.loads((root / "rs/anda_cloud_cdk/Cargo.toml").read_text())["package"]["version"]
+
+          versions = {
+              "npm": npm_version,
+              "cargo": cargo_version,
+          }
+          if len(set(versions.values())) != 1:
+              print(f"SDK versions must match before publishing: {versions}", file=sys.stderr)
+              sys.exit(1)
+
+          ref_type = os.environ.get("GITHUB_REF_TYPE")
+          ref_name = os.environ.get("GITHUB_REF_NAME")
+          expected_tag = f"v{npm_version}"
+          if ref_type == "tag" and ref_name != expected_tag:
+              print(f"Tag {ref_name} does not match SDK version {expected_tag}", file=sys.stderr)
+              sys.exit(1)
+
+          print(f"SDK version: {npm_version}")
+          PY
+
+      - name: Run TypeScript checks
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm --filter @ldclabs/anda_x402 test
+          pnpm --filter @ldclabs/anda_x402 build
+
+      - name: Run Rust tests
+        run: |
+          rustup update --no-self-update stable
+          cargo test -p anda_cloud_cdk --all-features
+
+  publish-npm:
+    name: Publish TypeScript SDK to npm
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Build package
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm --filter @ldclabs/anda_x402 build
+
+      # Trusted publishing needs npm CLI >= 11.5.1; Node 22 ships an older npm, and
+      # pnpm 11's OIDC publish is currently broken (pnpm/pnpm#11513), so publish via npm.
+      - name: Upgrade npm for trusted publishing
+        run: npm install --global npm@latest
+
+      - name: Dry-run npm publish
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        working-directory: ts/anda_x402
+        run: npm publish --dry-run --access public
+
+      # OIDC trusted publishing: no NODE_AUTH_TOKEN, provenance is generated automatically.
+      - name: Publish to npm
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        working-directory: ts/anda_x402
+        run: npm publish --access public
+
+  publish-cargo:
+    name: Publish Rust SDK to crates.io
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare Rust toolchain
+        run: rustup update --no-self-update stable
+
+      - name: Dry-run cargo publish
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: cargo publish -p anda_cloud_cdk --dry-run
+
+      # OIDC trusted publishing: mint a short-lived token from crates.io (no stored secret).
+      - name: Authenticate with crates.io
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: Publish to crates.io
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish -p anda_cloud_cdk
