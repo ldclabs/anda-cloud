@@ -1,51 +1,48 @@
 use candid::{
     CandidType, IDLValue, Nat, Principal, pretty::candid::value::pp_value, utils::ArgumentEncoder,
 };
+use ic_cdk::call::{Call, CallFailed, Response};
 use icrc_ledger_types::{
     icrc::generic_metadata_value::MetadataValue,
     icrc1::{
         account::Account,
         transfer::{Memo, TransferArg, TransferError},
     },
-    icrc2::{
-        allowance::{Allowance, AllowanceArgs},
-        transfer_from::{TransferFromArgs, TransferFromError},
-    },
+    icrc2::transfer_from::{TransferFromArgs, TransferFromError},
 };
-use num_traits::cast::ToPrimitive;
 
 use crate::store;
 
-const ANONYMOUS: Principal = Principal::anonymous();
 pub fn msg_caller() -> Result<Principal, String> {
     let caller = ic_cdk::api::msg_caller();
-    check_auth(&caller)?;
+    if caller == Principal::anonymous() {
+        return Err("anonymous user is not allowed".to_string());
+    }
     Ok(caller)
 }
 
-pub fn check_auth(user: &Principal) -> Result<(), String> {
-    if user == &ANONYMOUS {
-        Err("anonymous user is not allowed".to_string())
-    } else {
-        Ok(())
-    }
-}
-
-pub async fn call<In, Out>(id: Principal, method: &str, args: In) -> Result<Out, String>
+/// Calls a ledger and waits unboundedly, so the outcome of a transfer is
+/// always known.
+async fn call<In, Out>(id: Principal, method: &str, args: In) -> Result<Out, String>
 where
     In: ArgumentEncoder + Send,
     Out: candid::CandidType + for<'a> candid::Deserialize<'a>,
 {
-    let res = ic_cdk::call::Call::unbounded_wait(id, method)
-        .with_args(&args)
-        .await
-        .map_err(|err| format!("failed to call {} on {:?}, error: {:?}", method, id, err))?;
-    res.candid().map_err(|err| {
-        format!(
-            "failed to decode response from {} on {:?}, error: {:?}",
-            method, id, err
-        )
-    })
+    let res = Call::unbounded_wait(id, method).with_args(&args).await;
+    decode_reply(id, method, res)
+}
+
+fn decode_reply<Out>(
+    id: Principal,
+    method: &str,
+    res: Result<Response, CallFailed>,
+) -> Result<Out, String>
+where
+    Out: candid::CandidType + for<'a> candid::Deserialize<'a>,
+{
+    res.map_err(|err| format!("failed to call {method} on {id}, error: {err:?}"))?
+        .candid()
+        .map_err(|err| format!("failed to decode response from {method} on {id}, error: {err:?}"))
 }
 
 pub fn pretty_format<T>(data: &T) -> Result<String, String>
@@ -133,32 +130,12 @@ fn normalize_transfer_from_result(res: Result<Nat, TransferFromError>) -> Result
     }
 }
 
-#[allow(dead_code)]
-pub async fn token_allowance(
-    asset: Principal,
-    from: Principal,
-    spender: Principal,
-) -> Result<Allowance, String> {
-    let res: Allowance = call(
-        asset,
-        "icrc2_allowance",
-        (AllowanceArgs {
-            account: Account {
-                owner: from,
-                subaccount: None,
-            },
-            spender: Account {
-                owner: spender,
-                subaccount: None,
-            },
-        },),
-    )
-    .await?;
-    Ok(res)
-}
-
 pub async fn token_info(asset: Principal) -> Result<store::AssetInfo, String> {
-    let res: Vec<(String, MetadataValue)> = call(asset, "icrc1_metadata", ()).await?;
+    // A plain read, so a bounded wait is safe: a canister that never answers
+    // cannot keep this one from stopping.
+    let method = "icrc1_metadata";
+    let res: Vec<(String, MetadataValue)> =
+        decode_reply(asset, method, Call::bounded_wait(asset, method).await)?;
     let mut info = store::AssetInfo::default();
     for (key, value) in res {
         match (key.as_str(), value) {
@@ -166,10 +143,10 @@ pub async fn token_info(asset: Principal) -> Result<store::AssetInfo, String> {
             ("icrc1:symbol", MetadataValue::Text(val)) => info.symbol = val,
             ("icrc1:logo", MetadataValue::Text(val)) => info.logo = Some(val),
             ("icrc1:decimals", MetadataValue::Nat(val)) => {
-                info.decimals = val.0.to_u8().unwrap_or_default()
+                info.decimals = u8::try_from(&val.0).unwrap_or_default()
             }
             ("icrc1:fee", MetadataValue::Nat(val)) => {
-                info.transfer_fee = val.0.to_u128().unwrap_or_default()
+                info.transfer_fee = u128::try_from(&val.0).unwrap_or_default()
             }
             _ => {}
         }

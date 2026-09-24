@@ -25,6 +25,8 @@ module {
     value : Text;
     scheme : Text;
     from : Principal;
+    /// Ledger transaction ID. Empty for legacy records.
+    transaction : Text;
     nonce : Nat64;
     timestamp : Nat64;
     expires_at : Nat64;
@@ -70,6 +72,7 @@ module {
         Principal,
         Nat,
       ) -> async Result_6;
+    validate_admin_remove_supported_asset : shared Principal -> async Result_6;
     validate_admin_remove_supported_payment : shared (
         Nat8,
         Text,
@@ -78,6 +81,8 @@ module {
         Principal,
         Nat,
       ) -> async Result_6;
+    /// Deprecated name of `validate_admin_remove_supported_asset`, kept for
+    /// governance functions registered with it.
     validate_remove_update_supported_asset : shared Principal -> async Result_6;
   }
 }

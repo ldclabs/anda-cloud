@@ -29,6 +29,10 @@ export interface PaymentLogInfo {
   'value' : string,
   'scheme' : string,
   'from' : Principal,
+  /**
+   * Ledger transaction ID. Empty for legacy records.
+   */
+  'transaction' : string,
   'nonce' : bigint,
   'timestamp' : bigint,
   'expires_at' : bigint,
@@ -83,6 +87,7 @@ export interface _SERVICE {
     [Principal, Principal, bigint],
     Result_6
   >,
+  'validate_admin_remove_supported_asset' : ActorMethod<[Principal], Result_6>,
   'validate_admin_remove_supported_payment' : ActorMethod<
     [number, string],
     Result_6
@@ -91,6 +96,10 @@ export interface _SERVICE {
     [Principal, bigint],
     Result_6
   >,
+  /**
+   * Deprecated name of `validate_admin_remove_supported_asset`, kept for
+   * governance functions registered with it.
+   */
   'validate_remove_update_supported_asset' : ActorMethod<[Principal], Result_6>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

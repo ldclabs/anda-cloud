@@ -79,18 +79,21 @@ The canister exposes a comprehensive Candid API. Key endpoints include:
 info : () -> (Result_2) query;
 
 // Get the next valid nonce for the caller to make a payment
-next_nonce : () -> (Result_4) query;
+next_nonce : () -> (Result_5) query;
 
-// Get payment logs for the caller
-my_payment_logs : (nat32, opt nat64) -> (Result_3) query;
+// Get the caller's next nonce, totals sent, and latest 100 payment log IDs
+my_info : () -> (Result_3) query;
 
-// --- Administration ---
+// Page through the caller's payment logs, newest first
+my_payment_logs : (nat32, opt nat64) -> (Result_4) query;
 
-// Add a supported payment kind (version and scheme)
-admin_add_supported_payment : (X402Version, Scheme) -> (Result);
+// --- Administration (controllers and the governance canister) ---
+
+// Add a supported payment kind: x402 version 2, scheme "exact"
+admin_add_supported_payment : (nat8, text) -> (Result);
 
 // Remove a supported payment kind
-admin_remove_supported_payment : (X402Version, Scheme) -> (Result);
+admin_remove_supported_payment : (nat8, text) -> (Result);
 
 // Add or update a supported ICRC-1 asset
 admin_update_supported_asset : (principal, nat) -> (Result);
@@ -101,6 +104,9 @@ admin_remove_supported_asset : (principal) -> (Result);
 // Collect fees from the canister
 admin_collect_fees : (principal, principal, nat) -> (Result_1);
 ```
+
+Each admin method has a `validate_admin_*` counterpart for governance
+proposals, guarded the same way.
 
 Full Candid API definition: [anda_x402_canister.did](https://github.com/ldclabs/anda-cloud/tree/main/rs/anda_x402_canister/anda_x402_canister.did)
 
@@ -152,7 +158,9 @@ so funds move only after the resource has delivered.
 
 #### Content Types
 
-The HTTP API supports both JSON and CBOR formats. The content type is determined by the `Accept` and `Content-Type` headers:
+The HTTP API supports both JSON and CBOR formats. The request body is read
+according to its `Content-Type`; the response is CBOR when the body is, or when
+`Accept` asks for it:
 
 - For JSON: `application/json`
 - For CBOR: `application/cbor`
@@ -162,17 +170,21 @@ reduces bandwidth-related cycles and decoding work.
 
 #### Settlement Guarantees
 
-- Payment authorizations must expire between 1 minute and 1 hour from the
-  canister's current time.
+- Payment authorizations must not have expired, and must expire within 1 hour
+  of the canister's current time.
 - Payment request bodies are limited to 64 KiB; oversized `/settle` requests
   are rejected by the free query path before they are upgraded.
 - Structurally invalid, badly signed, stale-nonce, and unsupported settlement
   requests are also rejected during that query preflight, avoiding a paid
   update for requests that cannot succeed.
-- Retrying the most recently settled authorization is idempotent and returns
-  the original ledger transaction ID.
+- An authorization settles at most once. Repeating a settled one is refused by
+  both `/verify` and `/settle`; for the payer's most recent payment, the error
+  names its ledger transaction so a resource server that lost the settle
+  response can reconcile it.
 - ICRC-2 transfers use a deterministic `created_at_time`, so an ambiguous
   ledger response can be retried without charging the payer twice.
+- The facilitator's payment fee is pulled in a second transfer after `/settle`
+  has replied, so settling waits for a single ledger call.
 
 When upgrading from the legacy log layout, payer state is migrated lazily and
 old logs remain readable. After accepting payments with this layout, do not

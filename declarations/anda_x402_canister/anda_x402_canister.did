@@ -21,6 +21,8 @@ type PaymentLogInfo = record {
   value : text;
   scheme : text;
   from : principal;
+  // Ledger transaction ID. Empty for legacy records.
+  transaction : text;
   nonce : nat64;
   timestamp : nat64;
   expires_at : nat64;
@@ -62,7 +64,10 @@ service : (opt CanisterArgs) -> {
   next_nonce : () -> (Result_5) query;
   validate_admin_add_supported_payment : (nat8, text) -> (Result_6);
   validate_admin_collect_fees : (principal, principal, nat) -> (Result_6);
+  validate_admin_remove_supported_asset : (principal) -> (Result_6);
   validate_admin_remove_supported_payment : (nat8, text) -> (Result_6);
   validate_admin_update_supported_asset : (principal, nat) -> (Result_6);
+  // Deprecated name of `validate_admin_remove_supported_asset`, kept for
+  // governance functions registered with it.
   validate_remove_update_supported_asset : (principal) -> (Result_6);
 }

@@ -15,12 +15,15 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
+    sync::LazyLock,
 };
 
-use crate::helper::{token_allowance, transfer_token_from};
-
-const CLOCK_SKEW_MS: u64 = 1000 * 60; // 1 minute
+/// The only payment scheme this facilitator implements.
+pub const SCHEME_EXACT: &str = "exact";
 pub(crate) const MAX_AUTHORIZATION_TTL_MS: u64 = 60 * 60 * 1_000; // 1 hour
+/// How many of the latest payment log IDs `my_info` lists. The full history is
+/// paged by `my_payment_logs`.
+const PAYER_INFO_MAX_LOGS: usize = 100;
 // Keep new log IDs disjoint from the read-only append-log namespace.
 const V2_LOG_ID_OFFSET: u64 = 1 << 63;
 
@@ -92,9 +95,11 @@ pub struct AssetInfo {
     pub logo: Option<String>,
 }
 
-pub enum VerifiedPayment {
-    Pending(AssetInfo),
-    Settled(String),
+/// The part of an [`AssetInfo`] a payment needs.
+#[derive(Clone, Copy)]
+pub struct AssetFees {
+    pub payment_fee: u128,
+    pub transfer_fee: u128,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -198,6 +203,8 @@ pub struct PaymentLogInfo {
     pub expires_at: u64,
     pub nonce: u64,
     pub timestamp: u64, // in milliseconds
+    /// Ledger transaction ID. Empty for legacy records.
+    pub transaction: String,
 }
 
 impl PaymentLog {
@@ -213,31 +220,8 @@ impl PaymentLog {
             expires_at: self.expires_at,
             nonce: self.nonce,
             timestamp: self.timestamp,
+            transaction: self.transaction,
         }
-    }
-
-    /// True when both logs move exactly the same funds, i.e. the ledger would
-    /// deduplicate the second `icrc2_transfer_from` against the first.
-    fn same_transfer(&self, other: &PaymentLog) -> bool {
-        self.from == other.from
-            && self.scheme == other.scheme
-            && self.asset == other.asset
-            && self.to == other.to
-            && self.value == other.value
-            && self.fee == other.fee
-            && self.expires_at == other.expires_at
-            && self.nonce == other.nonce
-    }
-
-    fn matches(&self, payer: Principal, payload: &PaymentPayload) -> bool {
-        let authorization = &payload.payload.authorization;
-        self.from == payer
-            && self.scheme == payload.accepted.scheme
-            && self.asset == payload.accepted.asset
-            && self.to == authorization.to
-            && self.value == authorization.value.0
-            && self.expires_at == authorization.expires_at
-            && self.nonce == authorization.nonce
     }
 }
 
@@ -316,30 +300,52 @@ thread_local! {
             MEMORY_MANAGER.with_borrow(|m| m.get(PAYMENT_LOGS_V2_MEMORY_ID)),
         ));
 
-    // A payer can only settle their current nonce once at a time. This heap
-    // lock closes the reentrancy window while awaiting the token ledger. The
-    // reserved log is kept so a repeat of the very same authorization can take
-    // the lock over instead of being blocked by a stranded reservation.
-    static PAYMENTS_IN_FLIGHT: RefCell<BTreeMap<Principal, (PaymentLog, PayerStateV2)>> =
-        const { RefCell::new(BTreeMap::new()) };
+    // Payers with a settlement awaiting the token ledger, see `PayerGuard`.
+    static PAYERS_IN_FLIGHT: RefCell<BTreeSet<Principal>> = const { RefCell::new(BTreeSet::new()) };
+}
+
+/// Holds a payer's settlement lock, so that a nonce moves funds at most once
+/// while the ledger call is awaited.
+///
+/// The lock is released on drop, including when a trap after an `await`
+/// cancels the call: the executor then drops the call's locals, so the lock
+/// cannot be stranded.
+pub struct PayerGuard(Principal);
+
+impl PayerGuard {
+    pub fn acquire(payer: Principal) -> Result<Self, X402Error> {
+        PAYERS_IN_FLIGHT.with_borrow_mut(|in_flight| {
+            if in_flight.insert(payer) {
+                Ok(Self(payer))
+            } else {
+                Err(X402Error::SettleError(
+                    "Another payment from this payer is already in progress".to_string(),
+                ))
+            }
+        })
+    }
+}
+
+impl Drop for PayerGuard {
+    fn drop(&mut self) {
+        PAYERS_IN_FLIGHT.with_borrow_mut(|in_flight| {
+            in_flight.remove(&self.0);
+        });
+    }
 }
 
 pub mod state {
     use super::*;
-    use lazy_static::lazy_static;
-    use once_cell::sync::Lazy;
     use std::ops::Bound::{Excluded, Included};
 
-    lazy_static! {
-        pub static ref DEFAULT_EXPR_PATH: HttpCertificationPath<'static> =
-            HttpCertificationPath::wildcard("");
-        pub static ref DEFAULT_CERTIFICATION: HttpCertification = HttpCertification::skip();
-        pub static ref DEFAULT_CEL_EXPR: String =
-            create_cel_expr(&DefaultCelBuilder::skip_certification());
-    }
-
-    pub static DEFAULT_CERT_ENTRY: Lazy<HttpCertificationTreeEntry> =
-        Lazy::new(|| HttpCertificationTreeEntry::new(&*DEFAULT_EXPR_PATH, *DEFAULT_CERTIFICATION));
+    pub static DEFAULT_EXPR_PATH: LazyLock<HttpCertificationPath<'static>> =
+        LazyLock::new(|| HttpCertificationPath::wildcard(""));
+    pub static DEFAULT_CEL_EXPR: LazyLock<String> =
+        LazyLock::new(|| create_cel_expr(&DefaultCelBuilder::skip_certification()));
+    pub static DEFAULT_CERT_ENTRY: LazyLock<HttpCertificationTreeEntry<'static>> =
+        LazyLock::new(|| {
+            HttpCertificationTreeEntry::new(&*DEFAULT_EXPR_PATH, HttpCertification::skip())
+        });
 
     pub fn with<R>(f: impl FnOnce(&State) -> R) -> R {
         STATE.with_borrow(f)
@@ -408,14 +414,9 @@ pub mod state {
     }
 
     fn payer_state(caller: Principal) -> PayerStateV2 {
-        payer_state_with_source(caller).0
-    }
-
-    fn payer_state_with_source(caller: Principal) -> (PayerStateV2, bool) {
-        match PAYER_STATE_V2.with_borrow(|store| store.get(&caller)) {
-            Some(state) => (state, false),
-            None => (legacy_payer_state(caller).into(), true),
-        }
+        PAYER_STATE_V2
+            .with_borrow(|store| store.get(&caller))
+            .unwrap_or_else(|| legacy_payer_state(caller).into())
     }
 
     pub fn next_nonce(caller: Principal) -> u64 {
@@ -424,14 +425,26 @@ pub mod state {
 
     pub fn payer_info(caller: Principal) -> PayerStateInfo {
         let state = payer_state(caller);
-        let mut logs = legacy_payer_state(caller).logs;
-
-        PAYMENT_LOGS_V2.with_borrow(|store| {
-            // Read keys only: the log bodies are not needed to list their IDs.
-            for (_, id) in store.keys_range((Included((caller, 0)), Included((caller, u64::MAX)))) {
-                logs.insert(id);
-            }
+        // Read keys only: the log bodies are not needed to list their IDs.
+        let mut logs: BTreeSet<u64> = PAYMENT_LOGS_V2.with_borrow(|store| {
+            store
+                .keys_range((Included((caller, 0)), Included((caller, u64::MAX))))
+                .rev()
+                .take(PAYER_INFO_MAX_LOGS)
+                .map(|(_, id)| id)
+                .collect()
         });
+        // Legacy IDs are all older than the compact ones.
+        let missing = PAYER_INFO_MAX_LOGS - logs.len();
+        if missing > 0 {
+            logs.extend(
+                legacy_payer_state(caller)
+                    .logs
+                    .into_iter()
+                    .rev()
+                    .take(missing),
+            );
+        }
 
         PayerStateInfo {
             next_nonce: state.next_nonce,
@@ -490,7 +503,7 @@ pub mod state {
     pub fn verify_requirements(
         payload: &PaymentPayload,
         now_ms: u64,
-    ) -> Result<AssetInfo, X402Error> {
+    ) -> Result<AssetFees, X402Error> {
         if payload.accepted.network != NETWORK_ICP {
             return Err(X402Error::InvalidNetwork(format!(
                 "{}, expected: {NETWORK_ICP}",
@@ -503,15 +516,13 @@ pub mod state {
         // it were the ICRC-2 default.
         payload.accepted.validate()?;
 
-        if payload.payload.authorization.expires_at < now_ms.saturating_add(CLOCK_SKEW_MS) {
+        let expires_at = payload.payload.authorization.expires_at;
+        if expires_at <= now_ms {
             return Err(X402Error::InvalidPayloadAuthorizationValidBefore(format!(
-                "Expired authorization: {}, current time: {}",
-                payload.payload.authorization.expires_at, now_ms
+                "Expired authorization: {expires_at}, current time: {now_ms}"
             )));
         }
-        if payload.payload.authorization.expires_at
-            > now_ms.saturating_add(MAX_AUTHORIZATION_TTL_MS)
-        {
+        if expires_at > now_ms.saturating_add(MAX_AUTHORIZATION_TTL_MS) {
             return Err(X402Error::InvalidPayload(
                 "Authorization lifetime exceeds one hour".to_string(),
             ));
@@ -536,257 +547,99 @@ pub mod state {
                 ));
             }
 
-            let asset_info = state
+            // Copy out the fees only: an asset's logo can be a sizeable data URI.
+            let fees = state
                 .supported_assets
                 .get(&payload.accepted.asset)
-                .cloned()
+                .map(|info| AssetFees {
+                    payment_fee: info.payment_fee,
+                    transfer_fee: info.transfer_fee,
+                })
                 .ok_or_else(|| {
                     X402Error::InvalidPaymentRequirements(format!(
                         "Unsupported asset: {}",
                         payload.accepted.asset
                     ))
                 })?;
-            if payload.payload.authorization.value.0 <= asset_info.payment_fee {
+            if payload.payload.authorization.value.0 <= fees.payment_fee {
                 return Err(X402Error::InvalidPayloadAuthorizationValue(format!(
                     "Authorization value {} is not sufficient to cover payment fee {}",
-                    payload.payload.authorization.value.0, asset_info.payment_fee
+                    payload.payload.authorization.value.0, fees.payment_fee
                 )));
             }
-            Ok(asset_info)
+            Ok(fees)
         })
     }
 
-    /// Validates the payer-bound part of a payment: their nonce, and whether
-    /// this is a replay of the payment they last settled. Only callable once
-    /// the payload signature has established `payer`.
-    pub fn verify_payer(
-        payer: Principal,
-        payload: &PaymentPayload,
-        asset_info: AssetInfo,
-    ) -> Result<VerifiedPayment, X402Error> {
-        let payer_state = payer_state(payer);
-        let nonce = payload.payload.authorization.nonce;
-        if payer_state.last_log_id.is_some() && payer_state.next_nonce.checked_sub(1) == Some(nonce)
-        {
-            return settled_transaction(payer, payload, &payer_state).map(VerifiedPayment::Settled);
+    /// Checks that `nonce` is the payer's next one. Only callable once the
+    /// payload signature has established `payer`.
+    ///
+    /// An authorization settles at most once, so repeating one is refused.
+    /// For the payment settled last, the error names its ledger transaction,
+    /// so a resource server that lost the settle response can reconcile it.
+    pub fn verify_payer(payer: Principal, nonce: u64) -> Result<(), X402Error> {
+        let state = payer_state(payer);
+        if state.next_nonce == nonce {
+            return Ok(());
         }
-        if payer_state.next_nonce != nonce {
-            return Err(X402Error::VerifyError(format!(
-                "Invalid nonce: {nonce}, expected: {}",
-                payer_state.next_nonce
-            )));
-        }
-
-        Ok(VerifiedPayment::Pending(asset_info))
-    }
-
-    pub(super) fn settled_transaction(
-        payer: Principal,
-        payload: &PaymentPayload,
-        state: &PayerStateV2,
-    ) -> Result<String, X402Error> {
-        let nonce = payload.payload.authorization.nonce;
-        let Some(log_id) = state.last_log_id else {
-            // A lazily migrated legacy record has no stored ledger transaction.
-            return Err(X402Error::VerifyError(format!(
-                "Nonce {nonce} was settled before transaction replay was supported"
-            )));
-        };
-        let Some(log) = PAYMENT_LOGS_V2.with_borrow(|store| store.get(&(payer, log_id))) else {
-            return Err(X402Error::VerifyError(format!(
-                "Missing payment log for settled nonce {nonce}"
-            )));
-        };
-
-        if log.matches(payer, payload) && !log.transaction.is_empty() {
-            Ok(log.transaction)
-        } else {
-            Err(X402Error::VerifyError(format!(
-                "Nonce {} was already used by a different payment",
-                nonce
-            )))
-        }
-    }
-
-    #[allow(dead_code)]
-    pub async fn check_funds(
-        payer: Principal,
-        canister_self: Principal,
-        asset: Principal,
-        amount: u128,
-        now_ms: u64,
-    ) -> Result<(), X402Error> {
-        let res = token_allowance(asset, payer, canister_self)
-            .await
-            .map_err(|err| {
-                X402Error::VerifyError(format!("Failed to get token allowance: {}", err))
-            })?;
-        if let Some(expires_at) = res.expires_at
-            && expires_at <= now_ms
+        if state.next_nonce.checked_sub(1) == Some(nonce)
+            && let Some(tx) = last_transaction(payer, &state)
         {
             return Err(X402Error::VerifyError(format!(
-                "Token allowance expired at {}, current time: {}",
-                expires_at, now_ms
+                "Nonce {nonce} was already settled in transaction {tx}"
             )));
         }
-
-        if res.allowance < amount {
-            return Err(X402Error::InsufficientFunds(format!(
-                "{}, required: {}",
-                res.allowance, amount
-            )));
-        }
-
-        Ok(())
+        Err(X402Error::VerifyError(format!(
+            "Invalid nonce: {nonce}, expected: {}",
+            state.next_nonce
+        )))
     }
 
-    pub async fn transfer_funds(
-        canister_self: Principal,
-        mut log: PaymentLog,
-        transfer_fee: u128,
-        created_at_time: u64,
-    ) -> Result<String, X402Error> {
-        let payment_amount = log.value.checked_sub(log.fee).ok_or_else(|| {
-            X402Error::InvalidPayloadAuthorizationValue(format!(
-                "Authorization value {} is less than payment fee {}",
-                log.value, log.fee
-            ))
-        })?;
-        reserve_payment(&log)?;
+    /// The ledger transaction of the payment the payer settled last. Payers
+    /// migrated from the legacy layout have none until they settle again.
+    fn last_transaction(payer: Principal, state: &PayerStateV2) -> Option<String> {
+        let log_id = state.last_log_id?;
+        PAYMENT_LOGS_V2
+            .with_borrow(|store| store.get(&(payer, log_id)))
+            .map(|log| log.transaction)
+            .filter(|tx| !tx.is_empty())
+    }
 
-        let idx = match transfer_token_from(
-            log.asset,
-            log.from,
-            log.to,
-            payment_amount,
-            Some(log.nonce.into()),
-            Some(created_at_time),
-        )
-        .await
-        {
-            Ok(idx) => idx,
-            Err(err) => {
-                release_payment(log.from);
-                return Err(X402Error::SettleError(format!(
-                    "Failed to transfer payment: {err}"
-                )));
-            }
-        };
-        // Format the inner BigUint directly; Candid Nat's Display groups digits.
-        let tx = idx.0.to_string();
-
-        let asset = log.asset;
+    /// Records a payment the ledger has moved and advances the payer's nonce.
+    /// The caller holds the payer's [`PayerGuard`].
+    pub fn record_payment(log: PaymentLog) -> Result<u64, X402Error> {
         let payer = log.from;
-        let payment_fee = log.fee;
-        let nonce = log.nonce;
-        log.transaction.clone_from(&tx);
-        record_payment(log)?;
-
-        // Keep fee collection in the same update call. A zero-delay timer adds
-        // another charged update execution for every payment.
-        if let Some(fee) = payment_fee.checked_sub(transfer_fee).filter(|fee| *fee > 0) {
-            match transfer_token_from(
-                asset,
-                payer,
-                canister_self,
-                fee,
-                Some(nonce.into()),
-                Some(created_at_time),
-            )
-            .await
-            {
-                Ok(_) => STATE.with_borrow_mut(|state| {
-                    let total = state.total_collected_fees.entry(asset).or_insert(0);
-                    *total = total.saturating_add(fee);
-                }),
-                Err(err) => ic_cdk::println!(
-                    "failed to collect payment fee from {payer} for nonce {nonce}: {err}"
-                ),
-            }
-        }
-
-        Ok(tx)
-    }
-
-    pub(super) fn reserve_payment(log: &PaymentLog) -> Result<(), X402Error> {
-        let payer = log.from;
-        let nonce = log.nonce;
-        // The reservation lives on the heap and is only dropped by
-        // `record_payment` / `release_payment`, so a trap in the ledger callback
-        // would strand it and lock the payer out for good. Re-submitting the
-        // *same* authorization is therefore allowed to take the lock over: the
-        // repeated transfer reuses the deterministic `created_at_time`, so the
-        // ledger deduplicates it rather than charging the payer twice.
-        if let Some(reserved) = PAYMENTS_IN_FLIGHT
-            .with_borrow(|in_flight| in_flight.get(&payer).map(|(l, _)| l.clone()))
-            && !reserved.same_transfer(log)
-        {
-            return Err(X402Error::SettleError(
-                "Another payment from this payer is already in progress".to_string(),
-            ));
-        }
-
-        let (state, needs_migration) = payer_state_with_source(payer);
-        if state.next_nonce != nonce {
-            return Err(X402Error::VerifyError(format!(
-                "Invalid nonce: {nonce}, expected: {}",
-                state.next_nonce
-            )));
-        }
-        if nonce == u64::MAX {
-            return Err(X402Error::SettleError(
-                "Payer nonce space is exhausted".to_string(),
-            ));
-        }
-
-        // Persist only the compact fields when a legacy payer first writes.
-        // Failed ledger calls may leave this harmless migration committed.
-        if needs_migration {
-            PAYER_STATE_V2.with_borrow_mut(|store| {
-                store.insert(payer, state.clone());
-            });
-        }
-        PAYMENTS_IN_FLIGHT.with_borrow_mut(|in_flight| {
-            in_flight.insert(payer, (log.clone(), state));
-        });
-        Ok(())
-    }
-
-    pub(super) fn release_payment(payer: Principal) {
-        PAYMENTS_IN_FLIGHT.with_borrow_mut(|in_flight| {
-            in_flight.remove(&payer);
-        });
-    }
-
-    pub(super) fn record_payment(log: PaymentLog) -> Result<u64, X402Error> {
-        let payer_principal = log.from;
-        let (_, mut payer) = PAYMENTS_IN_FLIGHT
-            .with_borrow_mut(|in_flight| in_flight.remove(&payer_principal))
-            .ok_or_else(|| {
-                X402Error::SettleError("Payment was not reserved before recording".to_string())
-            })?;
-        if payer.next_nonce != log.nonce {
+        let mut state = payer_state(payer);
+        if state.next_nonce != log.nonce {
             return Err(X402Error::SettleError(format!(
                 "Payer nonce changed while settling: {}, expected {}",
-                payer.next_nonce, log.nonce
+                state.next_nonce, log.nonce
             )));
         }
 
         let log_id = V2_LOG_ID_OFFSET
-            .checked_add(PAYMENT_LOGS_V2.with_borrow(|current| current.len()))
+            .checked_add(PAYMENT_LOGS_V2.with_borrow(|store| store.len()))
             .ok_or_else(|| X402Error::SettleError("Payment log ID space is exhausted".into()))?;
-        payer.next_nonce = log.nonce + 1;
-        let total_sent = payer.total_sent.entry(log.asset).or_insert(0);
+        state.next_nonce += 1;
+        let total_sent = state.total_sent.entry(log.asset).or_insert(0);
         *total_sent = total_sent.saturating_add(log.value);
-        payer.last_log_id = Some(log_id);
+        state.last_log_id = Some(log_id);
 
         PAYMENT_LOGS_V2.with_borrow_mut(|store| {
-            store.insert((payer_principal, log_id), log);
+            store.insert((payer, log_id), log);
         });
+        // The first write also migrates a legacy payer to the compact layout.
         PAYER_STATE_V2.with_borrow_mut(|store| {
-            store.insert(payer_principal, payer);
+            store.insert(payer, state);
         });
         Ok(log_id)
+    }
+
+    pub fn add_collected_fee(asset: Principal, fee: u128) {
+        with_mut(|state| {
+            let total = state.total_collected_fees.entry(asset).or_insert(0);
+            *total = total.saturating_add(fee);
+        });
     }
 }
 
@@ -901,33 +754,17 @@ mod tests {
         assert!(decoded.transaction.is_empty());
     }
 
-    #[test]
-    fn retry_match_binds_all_fund_moving_fields() {
-        let log = payment_log();
-        let payload = payment_payload();
-        assert!(log.matches(principal(1), &payload));
-
-        let mut changed_asset = payload.clone();
-        changed_asset.accepted.asset = principal(4);
-        assert!(!log.matches(principal(1), &changed_asset));
-
-        let mut changed_recipient = payload.clone();
-        changed_recipient.payload.authorization.to = principal(4);
-        assert!(!log.matches(principal(1), &changed_recipient));
-
-        let mut changed_value = payload;
-        changed_value.payload.authorization.value = TokenAmount(999);
-        assert!(!log.matches(principal(1), &changed_value));
+    fn record(payer: Principal, nonce: u64) -> u64 {
+        let mut log = payment_log();
+        log.from = payer;
+        log.nonce = nonce;
+        state::record_payment(log).unwrap()
     }
 
     #[test]
-    fn v2_payment_record_round_trips_through_public_queries() {
+    fn a_settled_authorization_is_refused_and_names_its_transaction() {
         let payer = principal(9);
-        let mut log = payment_log();
-        log.from = payer;
-        log.nonce = 1;
-        state::reserve_payment(&log).unwrap();
-        let log_id = state::record_payment(log).unwrap();
+        let log_id = record(payer, 1);
 
         assert!(log_id >= V2_LOG_ID_OFFSET);
         assert_eq!(state::next_nonce(payer), 2);
@@ -935,16 +772,25 @@ mod tests {
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].id, log_id);
         assert_eq!(logs[0].nonce, 1);
+        assert_eq!(logs[0].transaction, "42");
 
-        let mut payload = payment_payload();
-        payload.payload.authorization.nonce = 1;
-        let compact = PAYER_STATE_V2
-            .with_borrow(|store| store.get(&payer))
-            .unwrap();
+        state::verify_payer(payer, 2).unwrap();
+        // Repeating the settled authorization, on /verify or /settle, is refused.
         assert_eq!(
-            state::settled_transaction(payer, &payload, &compact).unwrap(),
-            "42"
+            state::verify_payer(payer, 1),
+            Err(X402Error::VerifyError(
+                "Nonce 1 was already settled in transaction 42".to_string()
+            ))
         );
+        assert!(matches!(
+            state::verify_payer(payer, 0),
+            Err(X402Error::VerifyError(msg)) if msg.starts_with("Invalid nonce")
+        ));
+
+        let mut again = payment_log();
+        again.from = payer;
+        again.nonce = 1;
+        assert!(state::record_payment(again).is_err());
     }
 
     #[test]
@@ -959,18 +805,51 @@ mod tests {
             store.insert(payer, legacy);
         });
 
-        let mut log = payment_log();
-        log.from = payer;
-        log.nonce = 8;
-        state::reserve_payment(&log).unwrap();
-        state::release_payment(payer);
+        // Reads fall back to the legacy record until the payer settles again.
+        assert_eq!(state::next_nonce(payer), 8);
+        assert!(matches!(
+            state::verify_payer(payer, 7),
+            Err(X402Error::VerifyError(msg)) if msg.starts_with("Invalid nonce")
+        ));
+        assert!(
+            PAYER_STATE_V2
+                .with_borrow(|store| store.get(&payer))
+                .is_none()
+        );
 
+        let log_id = record(payer, 8);
         let compact = PAYER_STATE_V2
             .with_borrow(|store| store.get(&payer))
             .unwrap();
-        assert_eq!(compact.next_nonce, 8);
-        assert_eq!(compact.last_log_id, None);
-        assert_eq!(state::payer_info(payer).logs, BTreeSet::from([2, 4, 6]));
+        assert_eq!(compact.next_nonce, 9);
+        assert_eq!(compact.last_log_id, Some(log_id));
+        assert_eq!(
+            state::payer_info(payer).logs,
+            BTreeSet::from([2, 4, 6, log_id])
+        );
+    }
+
+    #[test]
+    fn payer_info_lists_only_the_latest_logs() {
+        let payer = principal(13);
+        let mut legacy = PayerState::default();
+        legacy.logs.extend([1, 2, 3]);
+        PAYER_STATE.with_borrow_mut(|store| {
+            store.insert(payer, legacy);
+        });
+
+        let mut ids: BTreeSet<u64> = (1..PAYER_INFO_MAX_LOGS as u64)
+            .map(|nonce| record(payer, nonce))
+            .collect();
+        // One slot is left, taken by the newest legacy log.
+        let mut expected = ids.clone();
+        expected.insert(3);
+        assert_eq!(state::payer_info(payer).logs, expected);
+
+        ids.insert(record(payer, PAYER_INFO_MAX_LOGS as u64));
+        let info = state::payer_info(payer);
+        assert_eq!(info.logs, ids);
+        assert_eq!(info.next_nonce, PAYER_INFO_MAX_LOGS as u64 + 1);
     }
 
     #[test]
@@ -990,6 +869,17 @@ mod tests {
         assert!(matches!(
             state::verify_requirements(&expired, expired.payload.authorization.expires_at),
             Err(X402Error::InvalidPayloadAuthorizationValidBefore(_))
+        ));
+
+        // Any remaining lifetime passes the expiry check, however short. The
+        // checks then stop at the payment kinds this test state lacks.
+        let short_lived = payment_payload();
+        assert!(matches!(
+            state::verify_requirements(
+                &short_lived,
+                short_lived.payload.authorization.expires_at - 1
+            ),
+            Err(X402Error::InvalidX402Version(_))
         ));
 
         let too_long_lived = payment_payload();
@@ -1053,23 +943,48 @@ mod tests {
     }
 
     #[test]
-    fn a_stranded_reservation_only_yields_to_the_same_authorization() {
+    fn configured_requirements_yield_the_asset_fees() {
+        let now_ms = 1_799_999_700_000;
+        state::with_mut(|s| {
+            s.supported_payments.push(SupportedKind {
+                x402_version: X402_VERSION,
+                scheme: SCHEME_EXACT.to_string(),
+                network: NETWORK_ICP.to_string(),
+                extra: None,
+            });
+            s.supported_assets.insert(
+                principal(2),
+                AssetInfo {
+                    symbol: "TKN".to_string(),
+                    decimals: 8,
+                    transfer_fee: 10,
+                    payment_fee: 100,
+                    logo: Some("data:image/png;base64,AAAA".to_string()),
+                    ..Default::default()
+                },
+            );
+        });
+
+        let fees = state::verify_requirements(&payment_payload(), now_ms).unwrap();
+        assert_eq!((fees.payment_fee, fees.transfer_fee), (100, 10));
+
+        let mut fee_only = payment_payload();
+        fee_only.payload.authorization.value = TokenAmount(100);
+        assert!(matches!(
+            state::verify_requirements(&fee_only, now_ms),
+            Err(X402Error::InvalidPayloadAuthorizationValue(_))
+        ));
+    }
+
+    #[test]
+    fn payer_guard_admits_one_settlement_per_payer() {
         let payer = principal(11);
-        let mut log = payment_log();
-        log.from = payer;
-        log.nonce = 1;
+        let guard = PayerGuard::acquire(payer).unwrap();
+        assert!(PayerGuard::acquire(payer).is_err());
+        // Other payers are not held up.
+        let _other = PayerGuard::acquire(principal(12)).unwrap();
 
-        state::reserve_payment(&log).unwrap();
-
-        // A different authorization for the same nonce stays locked out.
-        let mut other = log.clone();
-        other.to = principal(12);
-        assert!(state::reserve_payment(&other).is_err());
-
-        // Replaying the identical authorization takes the reservation over, so a
-        // reservation stranded by a trapped callback cannot block the payer forever.
-        state::reserve_payment(&log).unwrap();
-        state::record_payment(log).unwrap();
-        assert_eq!(state::next_nonce(payer), 2);
+        drop(guard);
+        let _guard = PayerGuard::acquire(payer).unwrap();
     }
 }

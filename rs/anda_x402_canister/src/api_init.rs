@@ -2,7 +2,7 @@ use anda_cloud_cdk::x402::{NETWORK_ICP, SupportedKind, X402_VERSION};
 use candid::{CandidType, Principal};
 use serde::Deserialize;
 
-use crate::store;
+use crate::store::{self, SCHEME_EXACT};
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub enum CanisterArgs {
@@ -29,7 +29,7 @@ fn init(args: Option<CanisterArgs>) {
             s.name = args.name;
             s.supported_payments = vec![SupportedKind {
                 x402_version: X402_VERSION,
-                scheme: "exact".to_string(),
+                scheme: SCHEME_EXACT.to_string(),
                 network: NETWORK_ICP.to_string(),
                 extra: None,
             }];

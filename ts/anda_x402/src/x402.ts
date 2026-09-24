@@ -275,7 +275,8 @@ export class X402Canister {
       from: log.from.toText(),
       nonce: log.nonce,
       timestamp: log.timestamp,
-      expiresAt: log.expires_at
+      expiresAt: log.expires_at,
+      transaction: log.transaction
     }))
   }
 

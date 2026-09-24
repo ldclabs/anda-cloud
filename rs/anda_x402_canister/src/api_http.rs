@@ -1,5 +1,6 @@
 use anda_cloud_cdk::x402::{
-    NETWORK_ICP, SettleResponse, TokenAmount, VerifyResponse, X402Error, X402Request,
+    NETWORK_ICP, PaymentPayload, SettleResponse, TokenAmount, VerifyResponse, X402Error,
+    X402Request,
 };
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use candid::{CandidType, Principal};
@@ -9,7 +10,7 @@ use ic_http_certification::{HeaderField, HttpRequest, HttpUpdateRequest};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 
-use crate::store;
+use crate::{helper::transfer_token_from, store};
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Default)]
 pub struct HttpResponse {
@@ -25,63 +26,114 @@ struct HttpError {
     message: String,
 }
 
+impl HttpError {
+    fn new(status_code: u16, message: impl Into<String>) -> Self {
+        Self {
+            status_code,
+            message: message.into(),
+        }
+    }
+}
+
+/// A payment turned away, with its payer once the signature has established one.
+type Rejection = (X402Error, Option<Principal>);
+
 static CBOR: &str = "application/cbor";
 static JSON: &str = "application/json";
 static IC_CERTIFICATE_HEADER: &str = "ic-certificate";
 static IC_CERTIFICATE_EXPRESSION_HEADER: &str = "ic-certificateexpression";
 const MAX_PAYMENT_BODY_BYTES: usize = 64 * 1024;
 
-/// Why a settlement was turned away on the free query path.
-enum SettleRejection {
-    TooLarge,
-    Invalid((X402Error, Option<Principal>)),
-}
-
-/// Runs the whole settlement check on the free query path so requests that
-/// cannot succeed never reach the paid update call. `None` means the request
-/// still has to be settled by `http_request_update`.
-fn settle_preflight(request: &HttpRequest<'static>) -> Option<SettleRejection> {
-    if request.body().len() > MAX_PAYMENT_BODY_BYTES {
-        return Some(SettleRejection::TooLarge);
-    }
-
-    let now_ms = ic_cdk::api::time() / 1_000_000;
-    match decode_payment(request.body(), supports_cbor(request.headers())) {
-        Ok(req) => verify_payment(ic_cdk::api::canister_self(), req, now_ms)
-            .err()
-            .map(SettleRejection::Invalid),
-        Err(err) => Some(SettleRejection::Invalid((err, None))),
-    }
-}
-
 #[ic_cdk::query(hidden = true)]
 fn http_request(request: HttpRequest<'static>) -> HttpResponse {
-    let req_path = request.get_path();
-    let is_settle = request.method().as_str() == "POST"
-        && matches!(req_path.as_ref(), Ok(path) if path == "/settle");
-    let settle_rejection = if is_settle {
-        settle_preflight(&request)
-    } else {
-        None
+    let (body_cbor, reply_cbor) = content_types(request.headers());
+    let rt = match request.get_path() {
+        Ok(path) => match (request.method().as_str(), path.as_str()) {
+            ("HEAD", _) => Ok(Vec::new()),
+            ("GET", "/") => encode(&store::state::info(), reply_cbor),
+            ("GET", "/supported") => encode(&store::state::supported(), reply_cbor),
+            ("POST", "/verify") => encode(&verify(request.body(), body_cbor), reply_cbor),
+            ("POST", "/settle") if request.body().len() > MAX_PAYMENT_BODY_BYTES => {
+                Err(HttpError::new(413, "payment request body is too large"))
+            }
+            // Run every settlement check on this free query path, so a payment
+            // that cannot succeed never reaches the paid update call.
+            ("POST", "/settle") => match check_payment(request.body(), body_cbor, now_ms()) {
+                Ok(_) => return upgrade(),
+                Err(rejection) => encode(&settle_response(Err(rejection)), reply_cbor),
+            },
+            (method, path) => Err(HttpError::new(
+                404,
+                format!("method {method}, path: {path}"),
+            )),
+        },
+        Err(err) => Err(HttpError::new(400, err.to_string())),
     };
-    if is_settle && settle_rejection.is_none() {
-        return HttpResponse {
-            status_code: 200,
-            headers: vec![],
-            body: b"Upgrade".to_vec().into(),
-            upgrade: Some(true),
-        };
-    }
+    respond(rt, reply_cbor, certified_headers(request.url()))
+}
 
-    let witness = store::state::http_tree_with(|t| {
-        t.witness(&store::state::DEFAULT_CERT_ENTRY, request.url())
+#[ic_cdk::update(hidden = true)]
+async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpResponse {
+    let (body_cbor, reply_cbor) = content_types(request.headers());
+    let rt = match request.get_path() {
+        Ok(path) => match (request.method().as_str(), path.as_str()) {
+            ("POST", "/settle") => encode(
+                &settle_response(settle(request.body(), body_cbor).await),
+                reply_cbor,
+            ),
+            (method, path) => Err(HttpError::new(
+                404,
+                format!("method {method}, path: {path}"),
+            )),
+        },
+        Err(err) => Err(HttpError::new(400, err.to_string())),
+    };
+    respond(rt, reply_cbor, vec![nosniff()])
+}
+
+fn upgrade() -> HttpResponse {
+    HttpResponse {
+        status_code: 200,
+        headers: vec![],
+        body: b"Upgrade".to_vec().into(),
+        upgrade: Some(true),
+    }
+}
+
+fn respond(
+    rt: Result<Vec<u8>, HttpError>,
+    reply_cbor: bool,
+    mut headers: Vec<HeaderField>,
+) -> HttpResponse {
+    let (status_code, content_type, body) = match rt {
+        Ok(body) => (200, if reply_cbor { CBOR } else { JSON }, body),
+        Err(err) => (err.status_code, "text/plain", err.message.into_bytes()),
+    };
+    headers.push(("content-type".to_string(), content_type.to_string()));
+    headers.push(("content-length".to_string(), body.len().to_string()));
+    HttpResponse {
+        status_code,
+        headers,
+        body: body.into(),
+        upgrade: None,
+    }
+}
+
+fn nosniff() -> HeaderField {
+    ("x-content-type-options".to_string(), "nosniff".to_string())
+}
+
+/// The headers of a query response. Every path is certified to skip response
+/// verification, which still takes a witness for the requested path.
+fn certified_headers(url: &str) -> Vec<HeaderField> {
+    let witness = store::state::http_tree_with(|tree| {
+        tree.witness(&store::state::DEFAULT_CERT_ENTRY, url)
             .expect("get witness failed")
     });
+    let certificate = ic_cdk::api::data_certificate().expect("no data certificate available");
 
-    let certified_data = ic_cdk::api::data_certificate().expect("no data certificate available");
-
-    let mut headers = vec![
-        ("x-content-type-options".to_string(), "nosniff".to_string()),
+    vec![
+        nosniff(),
         (
             IC_CERTIFICATE_EXPRESSION_HEADER.to_string(),
             store::state::DEFAULT_CEL_EXPR.clone(),
@@ -90,7 +142,7 @@ fn http_request(request: HttpRequest<'static>) -> HttpResponse {
             IC_CERTIFICATE_HEADER.to_string(),
             format!(
                 "certificate=:{}:, tree=:{}:, expr_path=:{}:, version=2",
-                BASE64.encode(certified_data),
+                BASE64.encode(certificate),
                 BASE64.encode(cbor_into_vec(&witness).expect("failed to serialize witness")),
                 BASE64.encode(
                     cbor_into_vec(&store::state::DEFAULT_EXPR_PATH.to_expr_path())
@@ -98,237 +150,43 @@ fn http_request(request: HttpRequest<'static>) -> HttpResponse {
                 )
             ),
         ),
-    ];
-
-    let req_path = match req_path {
-        Ok(path) => path,
-        Err(err) => {
-            headers.push(("content-type".to_string(), "text/plain".to_string()));
-            return HttpResponse {
-                status_code: 400,
-                headers,
-                body: err.to_string().into_bytes().into(),
-                upgrade: None,
-            };
-        }
-    };
-
-    let in_cbor = supports_cbor(request.headers());
-
-    let rt = match (request.method().as_str(), req_path.as_str()) {
-        ("HEAD", _) => Ok(Vec::new()),
-        ("GET", "/") => get_info(in_cbor),
-        ("GET", "/supported") => get_supported(in_cbor),
-        ("POST", "/verify") => post_verify(request.body(), in_cbor),
-        ("POST", "/settle") => match settle_rejection {
-            Some(SettleRejection::Invalid(error)) => encode_settle_result(Err(error), in_cbor),
-            // A preflight that passed already returned the upgrade response above,
-            // so the only case left here is an oversized body.
-            _ => Err(HttpError {
-                status_code: 413,
-                message: "payment request body is too large".to_string(),
-            }),
-        },
-        (method, path) => Err(HttpError {
-            status_code: 404,
-            message: format!("method {method}, path: {path}"),
-        }),
-    };
-
-    match rt {
-        Ok(body) => {
-            if in_cbor {
-                headers.push(("content-type".to_string(), CBOR.to_string()));
-            } else {
-                headers.push(("content-type".to_string(), JSON.to_string()));
-            }
-            headers.push(("content-length".to_string(), body.len().to_string()));
-            HttpResponse {
-                status_code: 200,
-                headers,
-                body: body.into(),
-                upgrade: None,
-            }
-        }
-        Err(err) => {
-            headers.push(("content-type".to_string(), "text/plain".to_string()));
-            HttpResponse {
-                status_code: err.status_code,
-                headers,
-                body: err.message.into_bytes().into(),
-                upgrade: None,
-            }
-        }
-    }
+    ]
 }
 
-#[ic_cdk::update(hidden = true)]
-async fn http_request_update(request: HttpUpdateRequest<'static>) -> HttpResponse {
-    let mut headers = vec![("x-content-type-options".to_string(), "nosniff".to_string())];
-
-    let req_path = match request.get_path() {
-        Ok(path) => path,
-        Err(err) => {
-            headers.push(("content-type".to_string(), "text/plain".to_string()));
-            return HttpResponse {
-                status_code: 400,
-                headers,
-                body: err.to_string().into_bytes().into(),
-                upgrade: None,
-            };
-        }
-    };
-
-    let in_cbor = supports_cbor(request.headers());
-
-    let rt = match (request.method().as_str(), req_path.as_str()) {
-        ("POST", "/settle") if request.body().len() <= MAX_PAYMENT_BODY_BYTES => {
-            post_settle(request.body(), in_cbor).await
-        }
-        ("POST", "/settle") => Err(HttpError {
-            status_code: 413,
-            message: "payment request body is too large".to_string(),
-        }),
-        (method, path) => Err(HttpError {
-            status_code: 404,
-            message: format!("method {method}, path: {path}"),
-        }),
-    };
-
-    match rt {
-        Ok(body) => {
-            if in_cbor {
-                headers.push(("content-type".to_string(), CBOR.to_string()));
-            } else {
-                headers.push(("content-type".to_string(), JSON.to_string()));
-            }
-            headers.push(("content-length".to_string(), body.len().to_string()));
-            HttpResponse {
-                status_code: 200,
-                headers,
-                body: body.into(),
-                upgrade: None,
-            }
-        }
-        Err(err) => {
-            headers.push(("content-type".to_string(), "text/plain".to_string()));
-            HttpResponse {
-                status_code: err.status_code,
-                headers,
-                body: err.message.into_bytes().into(),
-                upgrade: None,
-            }
-        }
-    }
-}
-
-fn get_supported(in_cbor: bool) -> Result<Vec<u8>, HttpError> {
-    let body = store::state::supported();
-    if in_cbor {
-        cbor_into_vec(&body).map_err(|err| HttpError {
-            status_code: 500,
-            message: format!("failed to serialize supported payments, error: {err}"),
-        })
+fn encode<T: Serialize>(value: &T, cbor: bool) -> Result<Vec<u8>, HttpError> {
+    let res = if cbor {
+        cbor_into_vec(value)
     } else {
-        serde_json::to_vec(&body).map_err(|err| HttpError {
-            status_code: 500,
-            message: format!("failed to serialize supported payments, error: {err}"),
-        })
-    }
-}
-
-fn get_info(in_cbor: bool) -> Result<Vec<u8>, HttpError> {
-    let body = store::state::info();
-    if in_cbor {
-        cbor_into_vec(&body).map_err(|err| HttpError {
-            status_code: 500,
-            message: format!("failed to serialize state, error: {err}"),
-        })
-    } else {
-        serde_json::to_vec(&body).map_err(|err| HttpError {
-            status_code: 500,
-            message: format!("failed to serialize state, error: {err}"),
-        })
-    }
-}
-
-fn post_verify(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
-    let canister_self = ic_cdk::api::canister_self();
-    let now_ms = ic_cdk::api::time() / 1_000_000;
-
-    let req = match decode_payment(body, in_cbor) {
-        Ok(req) => verify_payment(canister_self, req, now_ms),
-        Err(err) => Err((err, None)),
+        serde_json::to_vec(value).map_err(|err| err.to_string())
     };
-    let res = match req {
-        Ok(payer) => VerifyResponse::valid(payer.to_string()),
-        Err((err, maybe_payer)) => {
-            let payer_str = maybe_payer.map(|p| p.to_string());
-            VerifyResponse::invalid(payer_str, err)
-        }
-    };
-
-    if in_cbor {
-        cbor_into_vec(&res).map_err(|err| HttpError {
-            status_code: 500,
-            message: format!("failed to serialize VerifyResponse, error: {err}"),
-        })
-    } else {
-        serde_json::to_vec(&res).map_err(|err| HttpError {
-            status_code: 500,
-            message: format!("failed to serialize VerifyResponse, error: {err}"),
-        })
-    }
+    res.map_err(|err| HttpError::new(500, format!("failed to serialize response, error: {err}")))
 }
 
-async fn post_settle(body: &[u8], in_cbor: bool) -> Result<Vec<u8>, HttpError> {
-    let canister_self = ic_cdk::api::canister_self();
-    let now_ms = ic_cdk::api::time() / 1_000_000;
-    let req = match decode_payment(body, in_cbor) {
-        Ok(req) => settle_payment(canister_self, req, now_ms).await,
-        Err(err) => Err((err, None)),
+/// Whether the request body and the response are CBOR rather than JSON. The
+/// body is read by its `content-type`; the response is CBOR when the body is,
+/// or when `accept` asks for it.
+fn content_types(headers: &[HeaderField]) -> (bool, bool) {
+    let lists_cbor = |header: &str| {
+        headers
+            .iter()
+            .any(|(name, value)| name.eq_ignore_ascii_case(header) && value.contains(CBOR))
     };
-    encode_settle_result(req, in_cbor)
+    let body_cbor = lists_cbor("content-type");
+    (body_cbor, body_cbor || lists_cbor("accept"))
 }
 
-fn encode_settle_result(
-    result: Result<Settlement, (X402Error, Option<Principal>)>,
-    in_cbor: bool,
-) -> Result<Vec<u8>, HttpError> {
-    let network = NETWORK_ICP.to_string();
-    let res = match result {
-        Ok(settlement) => SettleResponse::settled(
-            network,
-            settlement.payer.to_string(),
-            settlement.transaction,
-            settlement.amount,
-        ),
-        Err((err, maybe_payer)) => {
-            SettleResponse::failed(network, maybe_payer.map(|p| p.to_string()), err)
-        }
-    };
-
-    if in_cbor {
-        cbor_into_vec(&res).map_err(|err| HttpError {
-            status_code: 500,
-            message: format!("failed to serialize SettleResponse, error: {err}"),
-        })
-    } else {
-        serde_json::to_vec(&res).map_err(|err| HttpError {
-            status_code: 500,
-            message: format!("failed to serialize SettleResponse, error: {err}"),
-        })
-    }
+fn now_ms() -> u64 {
+    ic_cdk::api::time() / 1_000_000
 }
 
-fn decode_payment(body: &[u8], in_cbor: bool) -> Result<X402Request, X402Error> {
+fn decode_payment(body: &[u8], body_cbor: bool) -> Result<X402Request, X402Error> {
     if body.len() > MAX_PAYMENT_BODY_BYTES {
         return Err(X402Error::InvalidPayload(
             "Payment request body is too large".to_string(),
         ));
     }
 
-    let req: X402Request = if in_cbor {
+    let req: X402Request = if body_cbor {
         from_slice(body)
             .map_err(|err| X402Error::InvalidPayload(format!("failed to decode cbor: {err}")))?
     } else {
@@ -340,51 +198,44 @@ fn decode_payment(body: &[u8], in_cbor: bool) -> Result<X402Request, X402Error> 
     Ok(req)
 }
 
-fn verify_payment(
-    canister_self: Principal,
-    req: X402Request,
-    now_ms: u64,
-) -> Result<Principal, (X402Error, Option<Principal>)> {
-    // Cheap, payer-independent checks first: verifying the payload signature can
-    // cost several canister-signature verifications and also runs on the free
-    // query preflight, so junk requests must not reach it.
-    let asset_info = store::state::verify_requirements(&req.payment_payload, now_ms)
-        .map_err(|err| (err, None))?;
+/// A payment that passed every check and can be settled.
+struct CheckedPayment {
+    payload: PaymentPayload,
+    payer: Principal,
+    fees: store::AssetFees,
+}
 
-    let payer = req
-        .payment_payload
+/// Decodes a payment and checks it up to, and including, the payer's nonce.
+fn check_payment(body: &[u8], body_cbor: bool, now_ms: u64) -> Result<CheckedPayment, Rejection> {
+    let payload = decode_payment(body, body_cbor)
+        .map_err(|err| (err, None))?
+        .payment_payload;
+
+    // Payer-independent checks first: verifying the signature can cost several
+    // canister-signature verifications and also runs on the free query
+    // preflight, so junk requests must not reach it.
+    let fees = store::state::verify_requirements(&payload, now_ms).map_err(|err| (err, None))?;
+    let payer = payload
         .payload
-        .verify_signature(now_ms, Some(canister_self))
+        .verify_signature(now_ms, Some(ic_cdk::api::canister_self()))
         .map_err(|err| (X402Error::InvalidPayloadSignature(err), None))?;
-
-    let _ = store::state::verify_payer(payer, &req.payment_payload, asset_info)
+    store::state::verify_payer(payer, payload.payload.authorization.nonce)
         .map_err(|err| (err, Some(payer)))?;
-    // `check_funds` relies on Inter-canister calls, which leads to expensive update calls.
-    // To optimize the verification process, we skip the fund checking here.
-    // let required_amount = req
-    //     .payment_payload
-    //     .payload
-    //     .authorization
-    //     .value
-    //     .0
-    //     .checked_add(asset_info.transfer_fee)
-    //     .ok_or_else(|| {
-    //         (
-    //             X402Error::InvalidPayload("payment amount overflow".to_string()),
-    //             Some(payer),
-    //         )
-    //     })?;
-    //
-    // store::state::check_funds(
-    //     payer,
-    //     canister_self,
-    //     req.payment_requirements.asset,
-    //     required_amount,
-    //     now_ms,
-    // )
-    // .await
-    // .map_err(|err| (err, Some(payer)))?;
-    Ok(payer)
+
+    // Funds are not checked here: `icrc2_allowance` would be an inter-canister
+    // call, which turns every verification into a paid update call.
+    Ok(CheckedPayment {
+        payload,
+        payer,
+        fees,
+    })
+}
+
+fn verify(body: &[u8], body_cbor: bool) -> VerifyResponse {
+    match check_payment(body, body_cbor, now_ms()) {
+        Ok(payment) => VerifyResponse::valid(payment.payer.to_string()),
+        Err((err, payer)) => VerifyResponse::invalid(payer.map(|p| p.to_string()), err),
+    }
 }
 
 /// A payment the ledger has moved, as reported back to the resource server.
@@ -396,62 +247,116 @@ struct Settlement {
     amount: TokenAmount,
 }
 
-async fn settle_payment(
-    canister_self: Principal,
-    req: X402Request,
-    now_ms: u64,
-) -> Result<Settlement, (X402Error, Option<Principal>)> {
-    // Same ordering as `verify_payment`: the payer-independent checks are cheap,
-    // the signature verification is not.
-    let asset_info = store::state::verify_requirements(&req.payment_payload, now_ms)
-        .map_err(|err| (err, None))?;
+fn settle_response(result: Result<Settlement, Rejection>) -> SettleResponse {
+    let network = NETWORK_ICP.to_string();
+    match result {
+        Ok(settlement) => SettleResponse::settled(
+            network,
+            settlement.payer.to_string(),
+            settlement.transaction,
+            settlement.amount,
+        ),
+        Err((err, payer)) => SettleResponse::failed(network, payer.map(|p| p.to_string()), err),
+    }
+}
 
-    let payer = req
-        .payment_payload
-        .payload
-        .verify_signature(now_ms, Some(canister_self))
-        .map_err(|err| (X402Error::InvalidPayloadSignature(err), None))?;
+async fn settle(body: &[u8], body_cbor: bool) -> Result<Settlement, Rejection> {
+    let now_ms = now_ms();
+    let CheckedPayment {
+        payload,
+        payer,
+        fees,
+    } = check_payment(body, body_cbor, now_ms)?;
+    let rejected = move |err: X402Error| (err, Some(payer));
 
-    let amount = req.payment_payload.payload.authorization.value;
-    let asset_info = match store::state::verify_payer(payer, &req.payment_payload, asset_info)
-        .map_err(|err| (err, Some(payer)))?
-    {
-        store::VerifiedPayment::Pending(asset_info) => asset_info,
-        store::VerifiedPayment::Settled(transaction) => {
-            return Ok(Settlement {
-                payer,
-                transaction,
-                amount,
-            });
-        }
-    };
+    let accepted = payload.accepted;
+    let authorization = payload.payload.authorization;
+    let created_at_time = payment_created_at_time(authorization.expires_at).map_err(rejected)?;
 
-    let created_at_time =
-        payment_created_at_time(req.payment_payload.payload.authorization.expires_at)
-            .map_err(|err| (err, Some(payer)))?;
+    // `check_payment` read the nonce and nothing has awaited since, so taking
+    // the payer's lock now lets that nonce move funds at most once.
+    let _guard = store::PayerGuard::acquire(payer).map_err(rejected)?;
+    let idx = transfer_token_from(
+        accepted.asset,
+        payer,
+        accepted.pay_to,
+        // `verify_requirements` ensures the value exceeds the payment fee.
+        authorization.value.0 - fees.payment_fee,
+        Some(authorization.nonce.into()),
+        Some(created_at_time),
+    )
+    .await
+    .map_err(|err| {
+        rejected(X402Error::SettleError(format!(
+            "Failed to transfer payment: {err}"
+        )))
+    })?;
+    // Format the inner BigUint directly; Candid Nat's Display groups digits.
+    let transaction = idx.0.to_string();
 
-    let log = store::PaymentLog {
-        scheme: req.payment_payload.accepted.scheme,
-        asset: req.payment_payload.accepted.asset,
+    store::state::record_payment(store::PaymentLog {
+        scheme: accepted.scheme,
+        asset: accepted.asset,
         from: payer,
-        to: req.payment_payload.accepted.pay_to,
-        value: req.payment_payload.payload.authorization.value.0,
-        fee: asset_info.payment_fee,
-        expires_at: req.payment_payload.payload.authorization.expires_at,
-        nonce: req.payment_payload.payload.authorization.nonce,
+        to: accepted.pay_to,
+        value: authorization.value.0,
+        fee: fees.payment_fee,
+        expires_at: authorization.expires_at,
+        nonce: authorization.nonce,
         timestamp: now_ms,
-        transaction: String::new(),
-    };
+        transaction: transaction.clone(),
+    })
+    .map_err(rejected)?;
 
-    let transaction =
-        store::state::transfer_funds(canister_self, log, asset_info.transfer_fee, created_at_time)
-            .await
-            .map_err(|err| (err, Some(payer)))?;
+    // Nothing awaits after this spawn, so the fee transfer starts only once the
+    // update has replied. It still runs in this call context: the resource
+    // server waits for one ledger call instead of two, and no extra message
+    // is charged.
+    if let Some(fee) = fees
+        .payment_fee
+        .checked_sub(fees.transfer_fee)
+        .filter(|fee| *fee > 0)
+    {
+        ic_cdk::futures::spawn(collect_fee(
+            accepted.asset,
+            payer,
+            fee,
+            authorization.nonce,
+            created_at_time,
+        ));
+    }
+
     Ok(Settlement {
         payer,
         transaction,
-        amount,
+        amount: authorization.value,
     })
+}
+
+/// Pulls the facilitator's fee for a settled payment. A failure only costs the
+/// facilitator its fee, so it is logged rather than reported.
+async fn collect_fee(
+    asset: Principal,
+    payer: Principal,
+    fee: u128,
+    nonce: u64,
+    created_at_time: u64,
+) {
+    match transfer_token_from(
+        asset,
+        payer,
+        ic_cdk::api::canister_self(),
+        fee,
+        Some(nonce.into()),
+        Some(created_at_time),
+    )
+    .await
+    {
+        Ok(_) => store::state::add_collected_fee(asset, fee),
+        Err(err) => {
+            ic_cdk::println!("failed to collect payment fee from {payer} for nonce {nonce}: {err}")
+        }
+    }
 }
 
 fn payment_created_at_time(expires_at: u64) -> Result<u64, X402Error> {
@@ -465,12 +370,6 @@ fn payment_created_at_time(expires_at: u64) -> Result<u64, X402Error> {
     created_at_ms.checked_mul(1_000_000).ok_or_else(|| {
         X402Error::InvalidPayload("Authorization creation time is too large".to_string())
     })
-}
-
-fn supports_cbor(headers: &[HeaderField]) -> bool {
-    headers
-        .iter()
-        .any(|(name, value)| (name == "accept" || name == "content-type") && value.contains(CBOR))
 }
 
 #[cfg(test)]
@@ -499,9 +398,12 @@ mod tests {
     }
 
     #[test]
-    fn preflight_failure_keeps_the_settle_response_shape() {
-        let body = encode_settle_result(
-            Err((X402Error::InvalidPayload("bad request".to_string()), None)),
+    fn a_rejected_settlement_keeps_the_settle_response_shape() {
+        let body = encode(
+            &settle_response(Err((
+                X402Error::InvalidPayload("bad request".to_string()),
+                None,
+            ))),
             false,
         )
         .unwrap();
@@ -515,5 +417,28 @@ mod tests {
             response.error_reason.as_deref(),
             Some("invalid_payload: bad request")
         );
+    }
+
+    #[test]
+    fn the_body_is_read_by_its_content_type() {
+        let headers = |pairs: &[(&str, &str)]| {
+            pairs
+                .iter()
+                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .collect::<Vec<_>>()
+        };
+
+        // A JSON body may ask for a CBOR response.
+        assert_eq!(
+            content_types(&headers(&[("Content-Type", JSON), ("Accept", CBOR)])),
+            (false, true)
+        );
+        assert_eq!(content_types(&headers(&[("accept", CBOR)])), (false, true));
+        // A CBOR body gets a CBOR response, as it always has.
+        assert_eq!(
+            content_types(&headers(&[("content-type", CBOR)])),
+            (true, true)
+        );
+        assert_eq!(content_types(&headers(&[])), (false, false));
     }
 }

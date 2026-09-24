@@ -50,6 +50,7 @@ export const idlFactory = ({ IDL }) => {
     'value' : IDL.Text,
     'scheme' : IDL.Text,
     'from' : IDL.Principal,
+    'transaction' : IDL.Text,
     'nonce' : IDL.Nat64,
     'timestamp' : IDL.Nat64,
     'expires_at' : IDL.Nat64,
@@ -97,6 +98,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'validate_admin_collect_fees' : IDL.Func(
         [IDL.Principal, IDL.Principal, IDL.Nat],
+        [Result_6],
+        [],
+      ),
+    'validate_admin_remove_supported_asset' : IDL.Func(
+        [IDL.Principal],
         [Result_6],
         [],
       ),

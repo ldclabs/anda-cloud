@@ -249,6 +249,8 @@ export interface PaymentLogInfo {
   nonce: bigint
   timestamp: bigint
   expiresAt: bigint
+  /// Ledger transaction ID. Empty for legacy records.
+  transaction: string
 }
 
 export interface TokenInfo {
