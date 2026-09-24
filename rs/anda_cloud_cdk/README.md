@@ -20,7 +20,7 @@ This crate provides the core data structures, validation logic, and cryptographi
 
 - **Agent Management**: Comprehensive structures for agent registration and information management, supporting ANDA, A2A, MCP, and other protocols
 - **Challenge Protocol**: Implementation of the agent health verification system
-- **Payment Protocol**: Support for the X402 payment protocol
+- **Payment Protocol**: Types for the x402 payment protocol v2 (`x402` module), including the `icp` mechanism whose signed `IcpPayloadAuthorization` binds the recipient, asset, amount, expiry and nonce
 - **TEE Support**: Structures for Trusted Execution Environment attestation
 
 ## Documentation
@@ -31,7 +31,7 @@ For detailed documentation of all structures and functions, please visit [docs.r
 
 The complete challenge process is as follows:
 1. The challenger obtains the agent's challenge code from the Registry Canister.
-   For first-time registration, the challenge code is [0u8; 32].
+   For first-time registration, the challenger picks a random 16-byte challenge code.
 2. The challenger obtains the agent's latest information through its protocol
    and generates a ChallengeRequest.
 3. The challenger signs the ChallengeRequest with their ICP identity and sends it to the agent.

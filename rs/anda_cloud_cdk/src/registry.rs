@@ -12,7 +12,8 @@ pub struct RegistryState {
     /// The name of this registry instance.
     pub name: String,
 
-    /// Maximum number of agents that can be registered in this registry.
+    /// Monotonic counter that assigns the internal index of the next registered agent.
+    /// It never decreases, so it is not the number of registered agents (see `agents_total`).
     pub max_agent: u64,
 
     /// Total number of agents currently registered in this registry.
@@ -51,31 +52,31 @@ pub struct RegistryState {
 #[non_exhaustive]
 pub enum RegistryError {
     /// A generic error with a descriptive message.
-    #[error("Generic error: {:?}", error)]
+    #[error("Generic error: {error}")]
     Generic { error: String },
 
     /// Error when an agent with the specified handle cannot be found.
-    #[error("Agent {:?} not found", handle)]
+    #[error("Agent {handle} not found")]
     NotFound { handle: String },
 
     /// Error when attempting to register an agent with a handle that already exists.
-    #[error("Agent {:?} already exists", handle)]
+    #[error("Agent {handle} already exists")]
     AlreadyExists { handle: String },
 
     /// Error when the request is malformed or contains invalid parameters.
-    #[error("Bad request: {:?}", error)]
+    #[error("Bad request: {error}")]
     BadRequest { error: String },
 
     /// Error when the caller is not authenticated or lacks valid credentials.
-    #[error("Unauthorized: {:?}", error)]
+    #[error("Unauthorized: {error}")]
     Unauthorized { error: String },
 
     /// Error when the caller is authenticated but lacks permission for the operation.
-    #[error("No permission: {:?}", error)]
+    #[error("No permission: {error}")]
     Forbidden { error: String },
 
     /// Error when the requested operation is not supported by the registry.
-    #[error("Not supported: {:?}", error)]
+    #[error("Not supported: {error}")]
     NotSupported { error: String },
 }
 
@@ -89,8 +90,7 @@ impl RegistryError {
     /// - An HTTP status code as a u16 value
     pub fn status_code(&self) -> u16 {
         match self {
-            RegistryError::BadRequest { .. } => 400,
-            RegistryError::NotSupported { .. } => 400,
+            RegistryError::BadRequest { .. } | RegistryError::NotSupported { .. } => 400,
             RegistryError::Unauthorized { .. } => 401,
             RegistryError::Forbidden { .. } => 403,
             RegistryError::NotFound { .. } => 404,

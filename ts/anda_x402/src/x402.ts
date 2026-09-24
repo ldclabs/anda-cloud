@@ -184,6 +184,7 @@ export class X402Canister {
     const now = Math.floor(Date.now() / 1000)
     const authorization: IcpPayloadAuthorization = {
       to: req.payTo,
+      asset: req.asset,
       value: req.amount,
       expiresAt: (now + req.maxTimeoutSeconds) * 1000,
       nonce: nonce

@@ -5,13 +5,25 @@ use std::collections::HashSet;
 
 use crate::{RegistryError, SignedEnvelope, TEEInfo, sha3_256};
 
+/// An all-zero challenge code.
+#[deprecated(
+    note = "the registry does not require it: a first registration takes any challenge code, and challengers should pick a random one"
+)]
 pub const ZERO_CHALLENGE_CODE: ByteArrayB64<16> = ByteArrayB64([0u8; 16]);
 
 /// Maximum allowed time drift in milliseconds for delegation verification.
 /// This prevents replay attacks while allowing for reasonable clock differences.
 pub const PERMITTED_DRIFT_MS: u64 = 60 * 1000;
 
-pub const CHALLENGE_EXPIRES_IN_MS: u64 = 1000 * 60 * 5; // 5 minute
+/// How long a [`ChallengeRequest`] stays acceptable after its `created_at`,
+/// in milliseconds, on top of [`PERMITTED_DRIFT_MS`].
+///
+/// Not to be confused with [`crate::RegistryState::challenge_expires_in_ms`],
+/// the period within which an agent must be challenged again to stay active.
+pub const CHALLENGE_EXPIRES_IN_MS: u64 = 1000 * 60 * 5; // 5 minutes
+
+/// Maximum length in bytes of any URL in agent or TEE information.
+pub const MAX_URL_BYTES: usize = 2048;
 
 /// Represents an AI agent registration information in the Anda network system.
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
@@ -97,10 +109,12 @@ impl AgentInfo {
     /// Validates the agent information to ensure it meets system requirements.
     ///
     /// Checks for:
+    /// - Handle format
     /// - Name presence and format
     /// - Description length
-    /// - Endpoint URL validity
-    /// - Protocol configuration validity
+    /// - Image and endpoint URL validity
+    /// - Protocol count and configuration validity
+    /// - Provider validity
     ///
     /// # Returns
     /// - `Ok(())` if validation passes
@@ -124,17 +138,20 @@ impl AgentInfo {
             return Err("description cannot be longer than 512 bytes".to_string());
         }
 
-        let endpoint = url::Url::parse(&self.endpoint)
-            .map_err(|_| "endpoint is not a valid URL".to_string())?;
-
-        if endpoint.scheme() != "https" {
-            return Err("endpoint should start with https://".to_string());
+        if !self.image.is_empty() {
+            check_https_url("image", &self.image)?;
         }
 
-        let mut names = HashSet::new();
+        check_https_url("endpoint", &self.endpoint)?;
+
+        if self.protocols.len() > 16 {
+            return Err("cannot declare more than 16 protocols".to_string());
+        }
+
+        let mut names = HashSet::with_capacity(self.protocols.len());
         for protocol in &self.protocols {
             protocol.validate()?;
-            if !names.insert(protocol.name.clone()) {
+            if !names.insert(protocol.name.as_str()) {
                 return Err(format!("duplicate protocol name: {}", protocol.name));
             }
         }
@@ -168,8 +185,12 @@ impl AgentProtocol {
             return Err("protocol name is required".to_string());
         }
 
-        if self.name.trim().to_ascii_uppercase() != self.name {
-            return Err("protocol name must be uppercase".to_string());
+        if !self
+            .name
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
+        {
+            return Err("protocol name must be uppercase letters, digits, '_' or '-'".to_string());
         }
 
         if self.name.len() > 12 {
@@ -180,13 +201,21 @@ impl AgentProtocol {
             return Err("protocol endpoint is required".to_string());
         }
 
-        let endpoint = self.endpoint.to_ascii_lowercase();
-        if endpoint.starts_with("http") {
-            let u = url::Url::parse(&self.endpoint)
-                .map_err(|_| "protocol endpoint is not a valid URL".to_string())?;
-            if u.scheme() != "https" {
-                return Err("protocol endpoint must use https scheme".to_string());
-            }
+        // HTTP endpoints must be https URLs; other URIs are accepted as they are.
+        if self
+            .endpoint
+            .get(..4)
+            .is_some_and(|scheme| scheme.eq_ignore_ascii_case("http"))
+        {
+            check_https_url("protocol endpoint", &self.endpoint)?;
+        } else if self.endpoint.len() > MAX_URL_BYTES {
+            return Err(format!(
+                "protocol endpoint cannot be longer than {MAX_URL_BYTES} bytes"
+            ));
+        }
+
+        if self.version.as_ref().is_some_and(|v| v.len() > 32) {
+            return Err("protocol version cannot be longer than 32 bytes".to_string());
         }
 
         Ok(())
@@ -221,21 +250,8 @@ impl AgentProvider {
             return Err("provider name cannot be longer than 32 bytes".to_string());
         }
 
-        let logo = url::Url::parse(&self.logo)
-            .map_err(|_| "provider logo is not a valid URL".to_string())?;
-        if logo.scheme() != "https" {
-            return Err("provider logo should start with https://".to_string());
-        }
-
-        let u = url::Url::parse(&self.url)
-            .map_err(|_| "provider url is not a valid URL".to_string())?;
-        if u.scheme() != "https" {
-            return Err("provider url should start with https://".to_string());
-        }
-
-        if url::Url::parse(&self.url).is_err() {
-            return Err("provider url is not a valid URL".to_string());
-        }
+        check_https_url("provider logo", &self.logo)?;
+        check_https_url("provider url", &self.url)?;
 
         Ok(())
     }
@@ -250,11 +266,11 @@ impl AgentProvider {
 /// - Can only contain: lowercase letters (a-z), digits (0-9), and underscores (_)
 pub fn validate_handle(handle: &str) -> Result<(), String> {
     if handle.is_empty() {
-        return Err("empty string".into());
+        return Err("handle is required".into());
     }
 
     if handle.len() > 64 {
-        return Err("string length exceeds the limit 64".into());
+        return Err("handle cannot be longer than 64 bytes".into());
     }
 
     let mut iter = handle.chars();
@@ -264,8 +280,24 @@ pub fn validate_handle(handle: &str) -> Result<(), String> {
 
     for c in iter {
         if !matches!(c, 'a'..='z' | '0'..='9' | '_' ) {
-            return Err(format!("invalid character: {}", c));
+            return Err(format!("handle contains invalid character: {c:?}"));
         }
+    }
+    Ok(())
+}
+
+/// Checks that `value` is a valid https URL of at most [`MAX_URL_BYTES`] bytes.
+/// `field` names the value in the error message.
+pub(crate) fn check_https_url(field: &str, value: &str) -> Result<(), String> {
+    if value.len() > MAX_URL_BYTES {
+        return Err(format!(
+            "{field} cannot be longer than {MAX_URL_BYTES} bytes"
+        ));
+    }
+
+    let url = url::Url::parse(value).map_err(|_| format!("{field} is not a valid URL"))?;
+    if url.scheme() != "https" {
+        return Err(format!("{field} should start with https://"));
     }
     Ok(())
 }
@@ -306,7 +338,8 @@ struct ChallengeRequestCoreRef<'a> {
 impl ChallengeRequest {
     /// Computes a digest (hash) of the challenge request's core components.
     ///
-    /// The digest includes the registry, code, and agent information.
+    /// The digest includes the registry, code, agent information and creation time,
+    /// but not the authentication, which is the challenger's signature over it.
     ///
     /// # Returns
     /// - A 32-byte array containing the SHA3-256 hash of the serialized data
@@ -362,20 +395,22 @@ impl ChallengeRequest {
     }
 
     /// Verifies the challenge request by validating its components and authentication.
-    pub fn verify(&self, now_ms: u64, registry: Principal) -> Result<(), RegistryError> {
+    ///
+    /// # Returns
+    /// - The principal of the challenger that signed the request
+    pub fn verify(&self, now_ms: u64, registry: Principal) -> Result<Principal, RegistryError> {
         self.validate(now_ms, &registry)
             .map_err(|error| RegistryError::BadRequest { error })?;
 
-        let digest = self.core_digest();
-        if let Some(auth) = &self.authentication {
-            auth.verify(now_ms, Some(registry), Some(&digest))
-                .map_err(|error| RegistryError::Unauthorized { error })?;
-        } else {
-            return Err(RegistryError::BadRequest {
+        let auth = self
+            .authentication
+            .as_ref()
+            .ok_or_else(|| RegistryError::BadRequest {
                 error: "challenger authentication is not provided".to_string(),
-            });
-        }
-        Ok(())
+            })?;
+        auth.verify(now_ms, Some(registry), Some(&self.core_digest()))
+            .map_err(|error| RegistryError::Unauthorized { error })?;
+        Ok(auth.sender())
     }
 }
 
@@ -386,7 +421,7 @@ impl ChallengeRequest {
 ///
 /// The complete challenge process is as follows:
 /// 1. The challenger obtains the agent's challenge code from the Registry Canister.
-///    For first-time registration, the challenge code is [0u8; 32].
+///    For first-time registration, the challenger picks a random 16-byte challenge code.
 /// 2. The challenger obtains the agent's latest information through its protocol
 ///    and generates a ChallengeRequest.
 /// 3. The challenger signs the ChallengeRequest with their ICP identity and sends it to the agent.
@@ -414,24 +449,29 @@ pub struct ChallengeEnvelope {
 impl ChallengeEnvelope {
     /// Verifies the challenge envelope by validating its components and authentication.
     /// The tee attestation is not verified if present. It should be verified separately.
-    pub fn verify(&self, now_ms: u64, registry: Principal) -> Result<(), RegistryError> {
+    ///
+    /// # Returns
+    /// - `(agent, challenger)`: the principals that signed the envelope and the request
+    pub fn verify(
+        &self,
+        now_ms: u64,
+        registry: Principal,
+    ) -> Result<(Principal, Principal), RegistryError> {
         if let Some(tee) = &self.tee {
             tee.validate()
                 .map_err(|error| RegistryError::BadRequest { error })?;
         }
 
-        self.request.verify(now_ms, registry)?;
-
-        let digest = self.request.digest();
+        let challenger = self.request.verify(now_ms, registry)?;
         self.authentication
-            .verify(now_ms, Some(registry), Some(&digest))
+            .verify(now_ms, Some(registry), Some(&self.request.digest()))
             .map_err(|error| RegistryError::Unauthorized { error })?;
 
-        Ok(())
+        Ok((self.authentication.sender(), challenger))
     }
 }
 
-pub static AGENT_EVENT_API: &str = "on_agent_event";
+pub const AGENT_EVENT_API: &str = "on_agent_event";
 
 /// Represents an event related to an agent's registration or status change.
 #[derive(Clone, Debug, CandidType, Deserialize, Serialize)]
@@ -512,6 +552,63 @@ mod tests {
         assert!(validate_handle("").is_err());
         assert!(validate_handle("1agent").is_err());
         assert!(validate_handle("agent-1").is_err());
+    }
+
+    #[test]
+    fn agent_info_validate_bounds_urls_and_protocols() {
+        let mut info = sample_agent_info();
+        info.image = String::new();
+        assert!(info.validate().is_ok());
+
+        info.image = "http://agent.example/image.png".into();
+        assert!(matches!(info.validate(), Err(message) if message.starts_with("image")));
+
+        let mut info = sample_agent_info();
+        info.endpoint = format!("https://agent.example/{}", "a".repeat(MAX_URL_BYTES));
+        assert!(matches!(info.validate(), Err(message) if message.contains("cannot be longer")));
+
+        let mut info = sample_agent_info();
+        info.protocols = (0..17)
+            .map(|i| AgentProtocol {
+                name: format!("P{i}"),
+                endpoint: "https://agent.example/protocol".into(),
+                version: None,
+            })
+            .collect();
+        assert!(matches!(info.validate(), Err(message) if message.contains("more than 16")));
+    }
+
+    #[test]
+    fn agent_protocol_validate_checks_name_endpoint_and_version() {
+        let protocol = |name: &str, endpoint: &str, version: Option<&str>| AgentProtocol {
+            name: name.into(),
+            endpoint: endpoint.into(),
+            version: version.map(Into::into),
+        };
+
+        assert!(
+            protocol("X402", "https://agent.example/x402", Some("v2"))
+                .validate()
+                .is_ok()
+        );
+        // Non-HTTP URIs are accepted as they are.
+        assert!(protocol("ANDA", "icp:aaaaa-aa", None).validate().is_ok());
+
+        assert!(
+            protocol("M CP", "https://agent.example", None)
+                .validate()
+                .is_err()
+        );
+        assert!(
+            protocol("MCP", "HTTP://agent.example", None)
+                .validate()
+                .is_err()
+        );
+        assert!(
+            protocol("MCP", "https://agent.example", Some(&"v".repeat(33)))
+                .validate()
+                .is_err()
+        );
     }
 
     #[test]

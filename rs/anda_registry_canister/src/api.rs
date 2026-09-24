@@ -17,10 +17,7 @@ fn get_state() -> Result<RegistryState, RegistryError> {
 pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
     let now_ms = ic_cdk::api::time() / MILLISECONDS;
     let canister_self = ic_cdk::api::canister_self();
-    input.verify(now_ms, canister_self)?;
-
-    let agent = input.authentication.sender();
-    let challenger = input.request.authentication.unwrap().sender();
+    let (agent, challenger) = input.verify(now_ms, canister_self)?;
     if !store::state::is_challenger(&challenger) {
         return Err(RegistryError::Forbidden {
             error: format!("challenger {} has no permission", challenger),
@@ -80,10 +77,7 @@ pub async fn register(input: ChallengeEnvelope) -> Result<(), RegistryError> {
 pub async fn challenge(input: ChallengeEnvelope) -> Result<(), RegistryError> {
     let now_ms = ic_cdk::api::time() / MILLISECONDS;
     let canister_self = ic_cdk::api::canister_self();
-    input.verify(now_ms, canister_self)?;
-
-    let agent = input.authentication.sender();
-    let challenger = input.request.authentication.unwrap().sender();
+    let (agent, challenger) = input.verify(now_ms, canister_self)?;
     if !store::state::is_challenger(&challenger) {
         return Err(RegistryError::Forbidden {
             error: format!("challenger {} has no permission", challenger),

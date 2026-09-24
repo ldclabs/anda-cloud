@@ -159,6 +159,10 @@ export interface IcpPayload {
 export interface IcpPayloadAuthorization {
   /// Recipient's wallet address
   to: string
+  /// Token ledger canister the payment is drawn from. It must equal the
+  /// requirements' `asset`; signing it keeps the recipient from settling the
+  /// authorized `value` on another ledger the payer approved.
+  asset: string
   /// Payment amount in atomic units.
   /// For `exact` scheme, this is the exact amount to be transferred.
   /// For `upto` scheme, this is the maximum amount that can be transferred.

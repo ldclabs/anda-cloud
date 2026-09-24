@@ -1,9 +1,9 @@
 [package]
 name = "anda_cloud_cdk"
 description = "A Canister Development Kit for the Anda Cloud"
-repository = "https://github.com/ldclabs/anda-cloud/tree/main/src/anda_cloud_cdk"
+repository = "https://github.com/ldclabs/anda-cloud/tree/main/rs/anda_cloud_cdk"
 publish = true
-version = "0.6.1"
+version = "0.7.0"
 edition.workspace = true
 keywords.workspace = true
 categories.workspace = true
@@ -11,7 +11,6 @@ license.workspace = true
 
 [dependencies]
 candid = { workspace = true }
-cbor2 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha3 = { workspace = true }
@@ -21,5 +20,5 @@ thiserror = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
+cbor2 = { workspace = true }
 hex = { workspace = true }
-serde_json = { workspace = true }

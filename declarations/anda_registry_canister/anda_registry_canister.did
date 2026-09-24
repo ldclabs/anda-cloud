@@ -89,7 +89,7 @@ type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
 // 
 // The complete challenge process is as follows:
 // 1. The challenger obtains the agent's challenge code from the Registry Canister.
-// For first-time registration, the challenge code is [0u8; 32].
+// For first-time registration, the challenger picks a random 16-byte challenge code.
 // 2. The challenger obtains the agent's latest information through its protocol
 // and generates a ChallengeRequest.
 // 3. The challenger signs the ChallengeRequest with their ICP identity and sends it to the agent.
@@ -180,7 +180,8 @@ type RegistryError = variant {
 // maintaining a list of authorized challengers, and coordinating with
 // other registry canisters in a distributed network.
 type RegistryState = record {
-  // Maximum number of agents that can be registered in this registry.
+  // Monotonic counter that assigns the internal index of the next registered agent.
+  // It never decreases, so it is not the number of registered agents (see `agents_total`).
   max_agent : nat64;
   // Optional principal ID of the governance canister that controls this registry.
   // If set, certain administrative operations require approval from this canister.

@@ -816,6 +816,7 @@ mod tests {
                 signature: ByteBufB64::new(),
                 authorization: IcpPayloadAuthorization {
                     to: principal(3),
+                    asset: principal(2),
                     value: TokenAmount(1_000),
                     expires_at: 1_800_000_000_000,
                     nonce: 7,

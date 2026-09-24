@@ -18,14 +18,17 @@ describe('IcpPayload', () => {
   it('IcpPayloadAuthorization digest', async () => {
     const auth: IcpPayloadAuthorization = {
       to: '77ibd-jp5kr-moeco-kgoar-rro5v-5tng4-krif5-5h2i6-osf2f-2sjtv-kqe',
+      asset: 'ryjl3-tyaaa-aaaaa-aaaba-cai',
       value: '100000000',
       expiresAt: 1761536123382,
       nonce: 42
     }
+    // Must match `test_icp_payload_authorization_digest` in
+    // `rs/anda_cloud_cdk/src/x402.rs`.
     const digest = sha3_256(deterministicEncode(auth))
     assert.equal(
       Buffer.from(digest).toString('hex'),
-      '269d40d6a23a75d9e4935d3010a8b8327115bb3dbadc7c311f43fec2445ae8f9'
+      '136c976c609762d8cd87dd0829880f85d973ef07b9fe9f380828f49800ded55f'
     )
   })
 })

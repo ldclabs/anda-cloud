@@ -1,9 +1,9 @@
 use candid::{CandidType, Principal};
-use core::fmt::Display;
 use ic_auth_types::ByteBufB64;
 use serde::{Deserialize, Serialize};
+use std::{fmt, str::FromStr};
 
-pub use ic_auth_verifier::envelope::SignedEnvelope;
+use crate::agent::check_https_url;
 
 /// Represents information about a Trusted Execution Environment (TEE) where an agent is running.
 ///
@@ -40,10 +40,23 @@ pub enum TEEKind {
     NITRO,
 }
 
-impl Display for TEEKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for TEEKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TEEKind::NITRO => write!(f, "NITRO"),
+            TEEKind::NITRO => f.write_str("NITRO"),
+        }
+    }
+}
+
+impl FromStr for TEEKind {
+    type Err = String;
+
+    /// Parses a TEE kind, ignoring ASCII case.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.eq_ignore_ascii_case("NITRO") {
+            Ok(TEEKind::NITRO)
+        } else {
+            Err(format!("Unknown TEE kind: {s}"))
         }
     }
 }
@@ -52,29 +65,20 @@ impl TryFrom<&str> for TEEKind {
     type Error = String;
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        match s.to_uppercase().as_str() {
-            "NITRO" => Ok(TEEKind::NITRO),
-            _ => Err(format!("Unknown TEE kind: {}", s)),
-        }
+        s.parse()
     }
 }
 
 impl TEEInfo {
     /// Validates the TEE information to ensure it meets system requirements.
     ///
-    /// Checks that the URL is properly formatted and valid.
+    /// Checks that the URL is a valid https URL and that the attestation is present.
     ///
     /// # Returns
     /// - `Ok(())` if validation passes
     /// - `Err(String)` with a descriptive error message if validation fails
     pub fn validate(&self) -> Result<(), String> {
-        if !self.url.starts_with("https://") {
-            return Err("url should start with https://".to_string());
-        }
-
-        if url::Url::parse(&self.url).is_err() {
-            return Err(format!("{:?} is not a valid URL", self.url));
-        }
+        check_https_url("tee url", &self.url)?;
 
         if self.attestation.is_none() {
             return Err("attestation is required".to_string());
@@ -92,8 +96,9 @@ mod tests {
     fn test_tee_protocol() {
         let val = TEEKind::try_from("NITRO").unwrap();
         assert_eq!(val, TEEKind::NITRO);
-        let val = TEEKind::try_from("nitro").unwrap();
+        let val: TEEKind = "nitro".parse().unwrap();
         assert_eq!(val, TEEKind::NITRO);
+        assert!("sgx".parse::<TEEKind>().is_err());
         assert_eq!(val.to_string(), "NITRO");
 
         let got = serde_json::to_string(&val).unwrap();

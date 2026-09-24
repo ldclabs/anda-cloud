@@ -430,6 +430,10 @@ impl IcpPayload {
 pub struct IcpPayloadAuthorization {
     /// Recipient's wallet address
     pub to: Principal,
+    /// Token ledger canister the payment is drawn from. It must equal
+    /// [`PaymentRequirements::asset`]; signing it keeps the recipient from
+    /// settling the authorized `value` on another ledger the payer approved.
+    pub asset: Principal,
     /// Payment amount in atomic units.
     /// For `exact` scheme, this is the exact amount to be transferred.
     /// For `upto` scheme, this is the maximum amount that can be transferred.
@@ -441,37 +445,33 @@ pub struct IcpPayloadAuthorization {
 }
 
 impl IcpPayloadAuthorization {
+    /// The SHA3-256 digest the payer signs.
     pub fn digest(&self) -> [u8; 32] {
-        IcpPayloadAuthorizationRaw::from(self).digest()
+        sha3_256(&self.signing_bytes())
+    }
+
+    /// The deterministic CBOR encoding of the authorization, with principals
+    /// and the amount as text, exactly as the TypeScript SDK encodes it.
+    fn signing_bytes(&self) -> Vec<u8> {
+        deterministic_cbor_into_vec(&IcpPayloadAuthorizationRaw {
+            to: self.to.to_text(),
+            asset: self.asset.to_text(),
+            value: self.value.to_string(),
+            expires_at: self.expires_at,
+            nonce: self.nonce,
+        })
+        .expect("failed to serialize IcpPayloadAuthorization")
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct IcpPayloadAuthorizationRaw {
-    pub to: String,
-    pub value: String,
-    pub expires_at: u64,
-    pub nonce: u64,
-}
-
-impl From<&IcpPayloadAuthorization> for IcpPayloadAuthorizationRaw {
-    fn from(auth: &IcpPayloadAuthorization) -> Self {
-        IcpPayloadAuthorizationRaw {
-            to: auth.to.to_string(),
-            value: auth.value.to_string(),
-            expires_at: auth.expires_at,
-            nonce: auth.nonce,
-        }
-    }
-}
-
-impl IcpPayloadAuthorizationRaw {
-    pub fn digest(&self) -> [u8; 32] {
-        let data = deterministic_cbor_into_vec(&self)
-            .expect("failed to serialize IcpPayloadAuthorization");
-        sha3_256(&data)
-    }
+struct IcpPayloadAuthorizationRaw {
+    to: String,
+    asset: String,
+    value: String,
+    expires_at: u64,
+    nonce: u64,
 }
 
 /// Wrapper for a payment payload and requirements sent by the client to a facilitator.
@@ -512,18 +512,25 @@ impl X402Request {
             ));
         }
 
-        if self.payment_payload.payload.authorization.to != self.payment_requirements.pay_to {
+        let authorization = &self.payment_payload.payload.authorization;
+        if authorization.to != self.payment_requirements.pay_to {
             return Err(X402Error::InvalidPayloadRecipientMismatch(format!(
                 "{}, expected: {}",
-                self.payment_payload.payload.authorization.to, self.payment_requirements.pay_to,
+                authorization.to, self.payment_requirements.pay_to,
             )));
         }
 
-        if self.payment_payload.payload.authorization.value.0 != self.payment_requirements.amount.0
-        {
+        if authorization.asset != self.payment_requirements.asset {
+            return Err(X402Error::InvalidPayload(format!(
+                "authorized asset {}, expected: {}",
+                authorization.asset, self.payment_requirements.asset
+            )));
+        }
+
+        if authorization.value != self.payment_requirements.amount {
             return Err(X402Error::InvalidPayloadAuthorizationValue(format!(
                 "{}, expected: {}",
-                self.payment_payload.payload.authorization.value, self.payment_requirements.amount
+                authorization.value, self.payment_requirements.amount
             )));
         }
 
@@ -686,7 +693,7 @@ impl From<u128> for TokenAmount {
 
 impl From<u64> for TokenAmount {
     fn from(value: u64) -> Self {
-        TokenAmount(value as u128)
+        TokenAmount(u128::from(value))
     }
 }
 
@@ -885,10 +892,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn request_version_must_agree_with_its_payload() {
-        let req = payment_requirements();
-        let json = serde_json::json!({
+    fn x402_request_json(req: &PaymentRequirements) -> Value {
+        serde_json::json!({
             "paymentPayload": {
                 "x402Version": X402_VERSION,
                 "accepted": req,
@@ -896,6 +901,7 @@ mod tests {
                     "signature": "",
                     "authorization": {
                         "to": req.pay_to.to_string(),
+                        "asset": req.asset.to_string(),
                         "value": req.amount.to_string(),
                         "expiresAt": 1_800_000_000_000u64,
                         "nonce": 1,
@@ -903,7 +909,12 @@ mod tests {
                 }
             },
             "paymentRequirements": req,
-        });
+        })
+    }
+
+    #[test]
+    fn request_version_must_agree_with_its_payload() {
+        let json = x402_request_json(&payment_requirements());
 
         // A client that predates the top-level field still validates.
         let request: X402Request = serde_json::from_value(json.clone()).unwrap();
@@ -916,6 +927,20 @@ mod tests {
         assert!(matches!(
             request.validate(),
             Err(X402Error::InvalidX402Version(1))
+        ));
+    }
+
+    #[test]
+    fn request_rejects_an_authorization_for_another_asset() {
+        let req = payment_requirements();
+        let mut json = x402_request_json(&req);
+        json["paymentPayload"]["payload"]["authorization"]["asset"] =
+            serde_json::json!(Principal::management_canister().to_string());
+
+        let request: X402Request = serde_json::from_value(json).unwrap();
+        assert!(matches!(
+            request.validate(),
+            Err(X402Error::InvalidPayload(message)) if message.contains("authorized asset")
         ));
     }
 
@@ -953,18 +978,21 @@ mod tests {
                 "77ibd-jp5kr-moeco-kgoar-rro5v-5tng4-krif5-5h2i6-osf2f-2sjtv-kqe",
             )
             .unwrap(),
-            value: TokenAmount(100000000),
-            expires_at: 1761536123382,
+            asset: Principal::from_text("ryjl3-tyaaa-aaaaa-aaaba-cai").unwrap(),
+            value: TokenAmount(100_000_000),
+            expires_at: 1_761_536_123_382,
             nonce: 42,
         };
 
-        let data = deterministic_cbor_into_vec(&auth)
-            .expect("failed to serialize IcpPayloadAuthorization");
-        println!("CBOR Data: {}", hex::encode(&data));
-        // a462746f581dfd5458e209ca338118c5ddaf66d37151417bd3e91e748ba2ea499d5502656e6f6e6365182a6576616c756569313030303030303030696578706972657341741b0000019a23bc21f6
-
-        let digest = auth.digest();
-        let expected_hex = "269d40d6a23a75d9e4935d3010a8b8327115bb3dbadc7c311f43fec2445ae8f9"; // Placeholder
-        assert_eq!(hex::encode(digest), expected_hex);
+        // The TypeScript SDK must sign the very same bytes, see the
+        // `IcpPayloadAuthorization digest` test in `ts/anda_x402/src/x402.test.ts`.
+        assert_eq!(
+            hex::encode(auth.signing_bytes()),
+            "a562746f783f37376962642d6a70356b722d6d6f65636f2d6b676f61722d72726f35762d35746e67342d6b726966352d35683269362d6f736632662d32736a74762d6b7165656173736574781b72796a6c332d74796161612d61616161612d61616162612d636169656e6f6e6365182a6576616c756569313030303030303030696578706972657341741b0000019a23bc21f6"
+        );
+        assert_eq!(
+            hex::encode(auth.digest()),
+            "136c976c609762d8cd87dd0829880f85d973ef07b9fe9f380828f49800ded55f"
+        );
     }
 }
